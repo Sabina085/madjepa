@@ -1,1 +1,0 @@
-print("Hi! My name is Pusheen and I am a cute cat!")
