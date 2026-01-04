@@ -63,7 +63,8 @@ def load_checkpoint(
         msg = encoder.load_state_dict(encoder_pretrained_dict_not_ddp)
         logger.info(f'Correctly loaded pretrained encoder from epoch {epoch} with msg: {msg}')
         if dinov3_ckpt:
-            encoder.forward = encoder_forward.__get__(encoder)
+            # Override the forward function of the context encoder model with a custom forward function (specific when using DinoV3 models)
+            encoder.forward = encoder_forward_dinov3.__get__(encoder)
 
         # -- loading predictor
         predictor_pretrained_dict = checkpoint['predictor']
@@ -79,7 +80,8 @@ def load_checkpoint(
             logger.info(f'Correctly loaded pretrained target encoder from epoch {epoch} with msg: {msg}')
 
         if dinov3_ckpt:
-            target_encoder.forward = target_encoder_forward.__get__(target_encoder)
+            # Override the forward function of the target encoder model with a custom forward function (specific when using DinoV3 models)
+            target_encoder.forward = target_encoder_forward_dinov3.__get__(target_encoder)
 
         # -- loading optimizer
         if (opt and ('opt' in checkpoint) and checkpoint['opt']):
@@ -235,11 +237,11 @@ def init_opt(
         ref_wd=wd,
         final_wd=final_wd,
         T_max=int(ipe_scale * num_epochs * iterations_per_epoch))
-    scaler = torch.cuda.amp.GradScaler() if use_bfloat16 else None
+    scaler = torch.amp.GradScaler('cuda') if use_bfloat16 else None
     return optimizer, scaler, scheduler, wd_scheduler
 
 
-def encoder_forward(self: object, x: Tensor, masks: Optional[List[Tensor] | Tensor]) -> Tensor:
+def encoder_forward_dinov3(self: object, x: Tensor, masks: Optional[List[Tensor] | Tensor]) -> Tensor:
     if masks is not None:
         if not isinstance(masks, list):
             masks = [masks]
@@ -268,19 +270,26 @@ def encoder_forward(self: object, x: Tensor, masks: Optional[List[Tensor] | Tens
         x = blk(x, rope_sincos)
 
     x_norm = self.norm(x)
-    x_norm_patch = x_norm[:, self.n_storage_tokens + 1:, :]
+    x_norm_patch = x_norm[:, self.n_storage_tokens + 1 :, :]
 
     return x_norm_patch
 
 
-def target_encoder_forward(self: object, x: Tensor) -> Tensor:
+def target_encoder_forward_dinov3(self: object, x: Tensor) -> Tensor:
+    # Used DinoV3 implementation: https://github.com/facebookresearch/dinov3/blob/main/dinov3/models/vision_transformer.py#L222
     x, (H, W) = self.prepare_tokens_with_masks(x=x, masks=None)
+    # H, W -> computed after patch embeddings
+    # Rotary Positional Embeddings (RoPE) used by DinoV3 models
     rope_sincos = self.rope_embed(H=H, W=W)
 
     for _, blk in enumerate(self.blocks):
         x = blk(x, rope_sincos)
 
     x_norm = self.norm(x)
-    x_norm_patch = x_norm[:, self.n_storage_tokens + 1:]
+
+    # [CLS] token -> position 0; 
+    # DinoV3 uses n_storage_tokens on sequence positions [1, n_storage_tokens] 
+    # Patch tokens will be from n_storage_tokens + 1 index to the end of the sequence
+    x_norm_patch = x_norm[:, self.n_storage_tokens + 1 :, :]
 
     return x_norm_patch

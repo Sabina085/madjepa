@@ -181,7 +181,8 @@ def main():
             predictor.eval()
             with torch.no_grad():
                 target_encoder_emb = target_encoder.forward(images)
-                target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
+                # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
                 B = len(target_encoder_emb)
                 
                 target_encoder_emb = apply_masks(target_encoder_emb, list_masks_target_encoder)
