@@ -52,10 +52,10 @@ meta:
   predictor_weights_path: pretrained_checkpoints/ijepa_checkpoints/IN22K-vit.h.14-900e.pth.tar
   target_encoder_model_name: dinov3_vits16
   target_encoder_weights_path: pretrained_checkpoints/dinov3_checkpoints/dinov3_vits16_pretrain_lvd1689m-08c60483.pth
-  predictor_depth: 12
+  predictor_depth: 16
   encoder_embed_dim: 384
   predictor_embed_dim: 384
-  predictor_num_heads: 6
+  predictor_num_heads: 16
   read_checkpoint: /home/vhondru/istoian/ijepa/pretrained_checkpoints/dinov3_checkpoints/dinov3_enc_vits16_pred_vit_tiny_ijepa_target_vits16.pth.tar
   use_bfloat16: true
   continue_training: false
