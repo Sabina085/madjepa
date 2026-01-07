@@ -6,7 +6,6 @@
 #
 
 import os
-import gc
 
 # -- FOR DISTRIBUTED TRAINING ENSURE ONLY 1 DEVICE VISIBLE PER PROCESS
 try:
@@ -46,7 +45,7 @@ from src.utils.tensors import repeat_interleave_batch
 from src.datasets.brain_mri import make_brain_mri
 
 from src.helper import (
-    load_checkpoint,
+    load_models_from_checkpoint,
     init_model,
     init_opt,
     init_model_dinov3
@@ -59,16 +58,22 @@ log_freq = 10
 checkpoint_freq = 50
 # --
 
-_GLOBAL_SEED = 0
+_GLOBAL_SEED = 42
 np.random.seed(_GLOBAL_SEED)
 torch.manual_seed(_GLOBAL_SEED)
-torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.benchmark = True # maybe set this to False (default)
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger()
 
 
-def main(args, resume_preempt=False):
+def main(args):
+    # Setting the device
+    if not torch.cuda.is_available():
+        device = torch.device('cpu')
+    else:
+        device = torch.device('cuda:0')
+        torch.cuda.set_device(device)
 
     # ----------------------------------------------------------------------- #
     #  PASSED IN PARAMS FROM CONFIG FILE
@@ -76,68 +81,78 @@ def main(args, resume_preempt=False):
 
     # -- META
     use_bfloat16 = args['meta']['use_bfloat16']
-    load_model = args['meta']['load_checkpoint'] or resume_preempt
-    continue_training = args['meta']['continue_training']
-    r_file = args['meta']['read_checkpoint']
-    if not torch.cuda.is_available():
-        device = torch.device('cpu')
-    else:
-        device = torch.device('cuda:0')
-        torch.cuda.set_device(device)
+    load_checkpoint_path = args['meta']['load_checkpoint_path']
+    checkpoint_type = args['meta']['checkpoint_type']
+    assert checkpoint_type in ['dinov3', 'ijepa'], "Checkpoint type should be: 'dinov3' or 'ijepa'"
 
+    # context encoder
     encoder_model_name = args['meta']['encoder_model_name']
-    encoder_weights_path = args['meta']['encoder_weights_path']
-    predictor_model_name = args['meta']['predictor_model_name']
-    predictor_weights_path = args['meta']['predictor_weights_path']
-    predictor_depth = args['meta']['predictor_depth']
+    encoder_weights_source = args['meta']['encoder_weights_source']
     encoder_embed_dim = args['meta']['encoder_embed_dim']
+
+    # predictor
+    predictor_model_name = args['meta']['predictor_model_name']
+    predictor_weights_source = args['meta']['predictor_weights_source']
+    predictor_depth = args['meta']['predictor_depth']
     predictor_embed_dim = args['meta']['predictor_embed_dim']
     predictor_num_heads = args['meta']['predictor_num_heads']
+
+    # target encoder
     target_encoder_model_name = args['meta']['target_encoder_model_name']
-    target_encoder_weights_path = args['meta']['target_encoder_weights_path']
+    target_encoder_weights_source = args['meta']['target_encoder_weights_source']
+
 
     # -- DATA
-    use_gaussian_blur = args['data']['use_gaussian_blur']
-    use_horizontal_flip = args['data']['use_horizontal_flip']
-    use_color_distortion = args['data']['use_color_distortion']
-    color_jitter = args['data']['color_jitter_strength']
-    # --
+    # training specifics
     batch_size = args['data']['batch_size']
-    pin_mem = args['data']['pin_mem']
-    num_workers = args['data']['num_workers']
-    root_path = args['data']['root_path']
-    image_folder = args['data']['image_folder']
     crop_size = args['data']['crop_size']
     crop_scale = args['data']['crop_scale']
-    # --
+
+    image_folder = args['data']['image_folder']
+    data_root_folder_path = args['data']['data_root_folder_path']
+    pin_mem = args['data']['pin_mem']
+    num_workers = args['data']['num_workers']
+
+    # data augmentation / transformations
+    color_jitter_strength = args['data']['color_jitter_strength']
+    use_color_distortion = args['data']['use_color_distortion']
+    use_gaussian_blur = args['data']['use_gaussian_blur']
+    use_horizontal_flip = args['data']['use_horizontal_flip']
+    
 
     # -- MASK
-    allow_overlap = args['mask']['allow_overlap']  # whether to allow overlap b/w context and target blocks
     patch_size = args['mask']['patch_size']  # patch-size for model training
-    num_enc_masks = args['mask']['num_enc_masks']  # number of context blocks
-    min_keep = args['mask']['min_keep']  # min number of patches in context block
+    allow_overlap = args['mask']['allow_overlap']  # whether to allow overlap b/w context and target blocks
+    
     enc_mask_scale = args['mask']['enc_mask_scale']  # scale of context blocks
-    num_pred_masks = args['mask']['num_pred_masks']  # number of target blocks
+    enc_mask_aspect_ratio = args['mask']['enc_mask_aspect_ratio'] # aspect ratio of the context blocks
+    enc_min_keep = args['mask']['enc_min_keep']  # min number of patches in context block
+    num_enc_masks = args['mask']['num_enc_masks']  # number of context blocks
+    
     pred_mask_scale = args['mask']['pred_mask_scale']  # scale of target blocks
-    aspect_ratio = args['mask']['aspect_ratio']  # aspect ratio of target blocks
-    # --
+    pred_mask_aspect_ratio = args['mask']['pred_mask_aspect_ratio']  # aspect ratio of target blocks
+    num_pred_masks = args['mask']['num_pred_masks']  # number of target blocks
+    
 
     # -- OPTIMIZATION
+    num_epochs = args['optimization']['num_epochs']
     ema = args['optimization']['ema']
     ipe_scale = args['optimization']['ipe_scale']  # scheduler scale factor (def: 1.0)
+
+    lr = args['optimization']['lr']
+    start_lr = args['optimization']['start_lr']
+    final_lr = args['optimization']['final_lr']
+    warmup = args['optimization']['warmup']
+
     wd = float(args['optimization']['weight_decay'])
     final_wd = float(args['optimization']['final_weight_decay'])
-    num_epochs = args['optimization']['epochs']
-    warmup = args['optimization']['warmup']
-    start_lr = args['optimization']['start_lr']
-    lr = args['optimization']['lr']
-    final_lr = args['optimization']['final_lr']
-
+    
+    
     # -- LOGGING
-    folder = args['logging']['folder']
+    logging_folder = args['logging']['logging_folder']
     tag = args['logging']['write_tag']
 
-    dump = os.path.join(folder, 'params-ijepa.yaml')
+    dump = os.path.join(logging_folder, 'config_run.yaml')
     with open(dump, 'w') as f:
         yaml.dump(args, f)
     # ----------------------------------------------------------------------- #
@@ -154,13 +169,14 @@ def main(args, resume_preempt=False):
         logger.setLevel(logging.ERROR)
 
     # -- log/checkpointing paths
-    log_file = os.path.join(folder, f'{tag}_r{rank}.csv')
-    checkpoint_folder = folder.replace("logs", "checkpoints")
-    save_path = os.path.join(checkpoint_folder, f'{tag}' + '-ep{epoch}.pth.tar')
+    log_file = os.path.join(logging_folder, f'{tag}_r{rank}.csv')
+    checkpoint_folder = logging_folder.replace("logs", "checkpoints")
+    save_path = os.path.join(checkpoint_folder, f'{tag}' + '-epoch{epoch}.pth.tar')
     latest_path = os.path.join(checkpoint_folder, f'{tag}-latest.pth.tar')
-    load_path = None
-    if load_model:
-        load_path = Path(r_file) if r_file is not None else latest_path
+    if load_checkpoint_path:
+        load_path = Path(load_checkpoint_path)
+    else:
+        load_path = None
 
     # -- make csv_logger
     csv_logger = CSVLogger(log_file,
@@ -172,23 +188,24 @@ def main(args, resume_preempt=False):
                            ('%d', 'time (ms)'))
 
     # -- init model
-    if "dino" in r_file:
-        dict_models = init_model_dinov3(
+    if checkpoint_type == "dinov3":
+        dict_init_models = init_model_dinov3(
             device=device,
             encoder_model_name=encoder_model_name,
-            encoder_weights_path=encoder_weights_path,
+            encoder_weights_path=encoder_weights_source,
             predictor_depth=predictor_depth,
             encoder_embed_dim=encoder_embed_dim,
             predictor_embed_dim=predictor_embed_dim,
             predictor_num_patches=(crop_size // patch_size) * (crop_size // patch_size),
             predictor_num_heads=predictor_num_heads,
             target_encoder_model_name = target_encoder_model_name,
-            target_encoder_weights_path = target_encoder_weights_path
+            target_encoder_weights_path = target_encoder_weights_source
         )
-        encoder = dict_models["encoder"]
-        predictor = dict_models["predictor"]
-        target_encoder = dict_models["target_encoder"]
-    else:
+        encoder = dict_init_models["encoder"]
+        predictor = dict_init_models["predictor"]
+        target_encoder = dict_init_models["target_encoder"]
+
+    elif checkpoint_type == "ijepa":
         encoder, predictor = init_model(
             device=device,
             patch_size=patch_size,
@@ -204,11 +221,11 @@ def main(args, resume_preempt=False):
         patch_size=patch_size,
         pred_mask_scale=pred_mask_scale,
         enc_mask_scale=enc_mask_scale,
-        aspect_ratio=aspect_ratio,
+        aspect_ratio=pred_mask_aspect_ratio,
         nenc=num_enc_masks,
         npred=num_pred_masks,
         allow_overlap=allow_overlap,
-        min_keep=min_keep)
+        min_keep=enc_min_keep)
 
     transform = make_transforms(
         crop_size=crop_size,
@@ -216,7 +233,7 @@ def main(args, resume_preempt=False):
         gaussian_blur=use_gaussian_blur,
         horizontal_flip=use_horizontal_flip,
         color_distortion=use_color_distortion,
-        color_jitter=color_jitter)
+        color_jitter=color_jitter_strength)
 
     # -- init data-loaders/samplers
     _, unsupervised_loader, unsupervised_sampler = make_brain_mri(
@@ -227,7 +244,7 @@ def main(args, resume_preempt=False):
             num_workers=num_workers,
             world_size=world_size,
             rank=rank,
-            root_path=root_path,
+            root_path=data_root_folder_path,
             image_folder=image_folder,
             drop_last=True
     )
@@ -256,18 +273,22 @@ def main(args, resume_preempt=False):
     start_epoch = 0
 
     # -- load training checkpoint
-    if load_model:
-        encoder, predictor, target_encoder, optimizer, scaler, start_epoch = load_checkpoint(
-            r_path=load_path,
+    if load_path:
+        loaded_dict_from_checkpoint = load_models_from_checkpoint(
+            checkpoint_path=load_path,
             encoder=encoder,
             predictor=predictor,
             target_encoder=target_encoder,
-            opt=optimizer,
-            scaler=scaler
+            optimizer=optimizer,
+            scaler=scaler,
+            dinov3_ckpt=(checkpoint_type == "dinov3")
         )
-
-        if not continue_training:
-            start_epoch = 0
+        encoder = loaded_dict_from_checkpoint["encoder"]
+        predictor = loaded_dict_from_checkpoint["predictor"]
+        target_encoder = loaded_dict_from_checkpoint["target_encoder"]
+        optimizer = loaded_dict_from_checkpoint["optimizer"]
+        scaler = loaded_dict_from_checkpoint["scaler"]
+        start_epoch = loaded_dict_from_checkpoint["epoch"] + 1
 
         for _ in range(start_epoch * ipe):
             scheduler.step()
@@ -294,13 +315,13 @@ def main(args, resume_preempt=False):
             'world_size': world_size,
             'lr': lr
         }
-        if "dino" in latest_path:
+        if checkpoint_type == "dinov3":
             save_dict["encoder_model_name"] = encoder_model_name
             save_dict["predictor_model_name"] = predictor_model_name
             save_dict["target_encoder_model_name"] = target_encoder_model_name
-            save_dict["encoder_weights_path"] = encoder_weights_path
-            save_dict["predictor_weights_path"] = predictor_weights_path
-            save_dict["target_encoder_weights_path"] = target_encoder_weights_path
+            save_dict["encoder_weights_source"] = encoder_weights_source
+            save_dict["predictor_weights_source"] = predictor_weights_source
+            save_dict["target_encoder_weights_source"] = target_encoder_weights_source
 
         if rank == 0:
             torch.save(save_dict, latest_path)
@@ -334,13 +355,12 @@ def main(args, resume_preempt=False):
             def train_step():
                 _new_lr = scheduler.step()
                 _new_wd = wd_scheduler.step()
-                # --
 
                 def forward_target():
-    
                     with torch.no_grad():
                         h = target_encoder.forward(imgs)
-                        h = F.layer_norm(h, (h.size(-1),))  # normalize over feature-dim
+                        # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
+                        # h = F.layer_norm(h, (h.size(-1),))  # normalize over feature-dim
                         B = len(h)
                         # -- create targets (masked regions of h)
                         h = apply_masks(h, masks_pred)

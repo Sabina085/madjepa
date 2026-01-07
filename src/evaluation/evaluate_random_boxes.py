@@ -10,7 +10,7 @@ from torchvision import transforms
 
 from src.utils.utils_evaluation import *
 from src.helper import (
-    load_checkpoint,
+    load_models_from_checkpoint,
     init_model_dinov3
 )
 from src.masks.utils import apply_masks
@@ -72,12 +72,12 @@ def main():
 
     # Load the Dinov3 pre-trained checkpoint
     print(f"Loading checkpoint from: {CKPT_PATH}")
-    encoder, predictor, target_encoder, _, _, _ = load_checkpoint(
-        r_path=CKPT_PATH,
+    encoder, predictor, target_encoder, _, _, _ = load_models_from_checkpoint(
+        checkpoint_path=CKPT_PATH,
         encoder=encoder,
         predictor=predictor,
         target_encoder=target_encoder,
-        opt=None,
+        optimizer=None,
         scaler=None
     )
 

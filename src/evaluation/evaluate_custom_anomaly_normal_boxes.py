@@ -11,7 +11,7 @@ from torchvision import transforms
 
 from src.utils.utils_evaluation import *
 from src.helper import (
-    load_checkpoint,
+    load_models_from_checkpoint,
     init_model_dinov3
 )
 from src.masks.utils import apply_masks
@@ -22,11 +22,11 @@ subpath_list = os.getcwd().split(os.sep)
 root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
-CONFIG_PATH = f"{root_directory_path}/{current_dir}/configs/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3.yaml"
-CKPT_PATH = f"{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vith14_ijepa_target_vits16_dinov3/checkpoints/jepa-brain-mri-dinov3-vits16-latest.pth.tar"
-VALIDATION_DATASET_PATH = f"{root_directory_path}/BMAD/dataset/BraTS2021_slice/valid"
-SELECTED_BOXES_PATH = f"{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vith14_ijepa_target_vits16_dinov3/custom_anomaly_normal_boxes"
-RESULTS_CSV_PATH = f"{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vith14_ijepa_target_vits16_dinov3/l2_distance_anomaly_vs_normal_box_validation_multiple_seeds.csv"
+CONFIG_PATH = f"/{root_directory_path}/{current_dir}/configs/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3.yaml"
+CKPT_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/checkpoints/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3-latest.pth.tar"
+VALIDATION_DATASET_PATH = f"/{root_directory_path}/BMAD/dataset/BraTS2021_slice/valid"
+SELECTED_BOXES_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/custom_anomaly_normal_boxes"
+RESULTS_CSV_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/l2_distance_anomaly_vs_normal_box_validation_multiple_seeds.csv"
 
 # How many times to repeat the selection of the boxes (as it involves some randomness) 
 NUM_SEEDS = 15
@@ -46,12 +46,12 @@ def main():
     # Read the configuration file (which was used for generating the checkpoint)
     # --- context encoder
     encoder_model_name = config["meta"]["encoder_model_name"]
-    encoder_weights_path = config["meta"]["encoder_weights_path"]
+    encoder_weights_path = config["meta"]["encoder_weights_source"]
     encoder_embed_dim = config["meta"]["encoder_embed_dim"]
 
     # --- target encoder
     target_encoder_model_name = config["meta"]["target_encoder_model_name"]
-    target_encoder_weights_path = config["meta"]["target_encoder_weights_path"]
+    target_encoder_weights_path = config["meta"]["target_encoder_weights_source"]
 
     # --- predictor
     predictor_depth = config["meta"]["predictor_depth"]
@@ -90,14 +90,18 @@ def main():
 
     # Load the I-Jepa pre-trained checkpoint
     print(f"Loading checkpoint from: {CKPT_PATH}")
-    encoder, predictor, target_encoder, _, _, _ = load_checkpoint(
-        r_path=CKPT_PATH,
+    loaded_dict_from_checkpoint = load_models_from_checkpoint(
+        checkpoint_path=CKPT_PATH,
         encoder=encoder,
         predictor=predictor,
         target_encoder=target_encoder,
-        opt=None,
-        scaler=None
+        optimizer=None,
+        scaler=None,
+        dinov3_ckpt=True
     )
+    encoder = loaded_dict_from_checkpoint["encoder"]
+    predictor = loaded_dict_from_checkpoint["predictor"]
+    target_encoder = loaded_dict_from_checkpoint["target_encoder"]
 
     # Load the validation dataset
     input_transforms = transforms.Compose([

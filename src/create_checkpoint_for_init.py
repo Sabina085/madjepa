@@ -8,16 +8,16 @@ logger = logging.getLogger()
 
 CONFIG_CKPT = {
     "encoder_model_name": "dinov3_vits16",
-    "encoder_weights_path": "pretrained_checkpoints/dinov3_models/dinov3_vits16_pretrain_lvd1689m-08c60483.pth",
+    "encoder_weights_source": "pretrained_checkpoints/dinov3_models/dinov3_vits16_pretrain_lvd1689m-08c60483.pth",
     "encoder_embed_dim": 384,
-    "predictor_model_name": "vit16_predictor_ijepa",
+    "predictor_model_name": "ijepa_predictor_from_IN22K_vitg16_600",
     "ijepa_checkpoint_path": "pretrained_checkpoints/ijepa_checkpoints/IN22K-vit.g.16-600e.pth.tar",
     "predictor_num_patches": 196,
     "predictor_embed_dim": 384,
     "predictor_depth": 16,
     "predictor_num_heads": 16, # it seems that the number of heads for the predictor is set to be equal to the number of heads of the encoder (vitg in our case, as we are using the 16x16 I-Jepa checkpoint)
     "target_encoder_model_name": "dinov3_vits16",
-    "target_encoder_weights_path": "pretrained_checkpoints/dinov3_models/dinov3_vits16_pretrain_lvd1689m-08c60483.pth",
+    "target_encoder_weights_source": "pretrained_checkpoints/dinov3_models/dinov3_vits16_pretrain_lvd1689m-08c60483.pth",
     "github_repo": "facebookresearch/dinov3",
     "save_path": "pretrained_checkpoints/init_checkpoints/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3.pth.tar"
 }
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     encoder = torch.hub.load(
         repo_or_dir=CONFIG_CKPT["github_repo"],
         model=CONFIG_CKPT["encoder_model_name"],
-        weights=CONFIG_CKPT["encoder_weights_path"],
+        weights=CONFIG_CKPT["encoder_weights_source"],
         source="github"
     )
     print(f"Loaded pre-trained encoder - DinoV3 checkpoint for {CONFIG_CKPT['encoder_model_name']}")
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     target_encoder = torch.hub.load(
         repo_or_dir=CONFIG_CKPT["github_repo"],
         model=CONFIG_CKPT["target_encoder_model_name"],
-        weights=CONFIG_CKPT["target_encoder_weights_path"],
+        weights=CONFIG_CKPT["target_encoder_weights_source"],
         source="github"
     )
     print(f"Loaded pre-trained target encoder - DinoV3 checkpoint for"

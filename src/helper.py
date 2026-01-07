@@ -44,62 +44,81 @@ def init_weights(m):
         torch.nn.init.constant_(m.weight, 1.0)
 
 
-def load_checkpoint(
-    r_path,
-    encoder,
-    predictor,
-    target_encoder,
-    opt,
-    scaler,
-    dinov3_ckpt=True
-):
-    try:
-        checkpoint = torch.load(r_path, map_location=torch.device('cpu'))
-        epoch = checkpoint['epoch']
+def load_models_from_checkpoint(
+    checkpoint_path: str,
+    encoder: object,
+    predictor: object,
+    target_encoder: object,
+    optimizer: Optional[object],
+    scaler: Optional[object],
+    dinov3_ckpt: Optional[bool] = True
+) -> Dict[str, object]:
+    """
+    Function for loading the weights of the pre-trained encoder, predictor and target encoder from a checkpoint. 
+    Optionally, the checkpoint could contain a saved optimizer and a scaler that will be also loaded. 
+    
+    :param checkpoint_path: str - checkpoint path
+    :param encoder: object - the initialized encoder model object
+    :param predictor: object - the initialized predictor model object
+    :param target_encoder: object - the initialized target encoder model object
+    :param optimizer: Optional[object] - the initialized optimizer object
+    :param scaler: Optional[object] - the initialized scaler object
+    :param dinov3_ckpt: bool = True - whether we will load a DinoV3 pretrained model (as the context and target encoders models) or not. Default:  True
+    :return: Dict[str, object] - a dictionary containing the encoder, predictor, target_encoder, optimizer and the scaler 
+    with the loaded weights and values from the checkpoint. The checkpoint witll also contain the epoch to be used for restarting the training.
+    If it is the first training epoch, epoch = -1.
+    """
+    logger.info(f"Loading the checkpoint from the path {checkpoint_path}...\n")
+    checkpoint = torch.load(f=checkpoint_path, map_location=torch.device('cpu'))
+    epoch = checkpoint['epoch']
 
-        # -- loading encoder
-        encoder_pretrained_dict = checkpoint['encoder']
-        encoder_pretrained_dict_not_ddp = convert_from_ddp_to_normal_state_dict(encoder_pretrained_dict)
-        msg = encoder.load_state_dict(encoder_pretrained_dict_not_ddp)
-        logger.info(f'Correctly loaded pretrained encoder from epoch {epoch} with msg: {msg}')
-        if dinov3_ckpt:
-            # Override the forward function of the context encoder model with a custom forward function (specific when using DinoV3 models)
-            encoder.forward = encoder_forward_dinov3.__get__(encoder)
+    # -- loading encoder
+    encoder_pretrained_dict = checkpoint['encoder']
+    encoder_pretrained_dict_not_ddp = convert_from_ddp_to_normal_state_dict(encoder_pretrained_dict)
+    msg = encoder.load_state_dict(encoder_pretrained_dict_not_ddp, strict=True)
+    if dinov3_ckpt:
+        # Override the forward function of the context encoder model with a custom forward function
+        # Necessary when loading a pre-trained DinoV3 model to be used as the (context) encoder
+        encoder.forward = encoder_forward_dinov3.__get__(encoder)
+    logger.info(f'Correctly loaded pretrained encoder from epoch {epoch} with msg: {msg}')
 
-        # -- loading predictor
-        predictor_pretrained_dict = checkpoint['predictor']
-        predictor_pretrained_dict_not_ddp = convert_from_ddp_to_normal_state_dict(predictor_pretrained_dict)
-        msg = predictor.load_state_dict(predictor_pretrained_dict_not_ddp)
-        logger.info(f'Correctly loaded pretrained predictor from epoch {epoch} with msg: {msg}')
+    # -- loading predictor
+    predictor_pretrained_dict = checkpoint['predictor']
+    predictor_pretrained_dict_not_ddp = convert_from_ddp_to_normal_state_dict(predictor_pretrained_dict)
+    msg = predictor.load_state_dict(predictor_pretrained_dict_not_ddp, strict=True)
+    logger.info(f'Correctly loaded pretrained predictor from epoch {epoch} with msg: {msg}')
 
-        # -- loading target_encoder
-        if target_encoder is not None:
-            target_encoder_pretrained_dict = checkpoint['target_encoder']
-            target_encoder_pretrained_dict_not_ddp = convert_from_ddp_to_normal_state_dict(target_encoder_pretrained_dict)
-            msg = target_encoder.load_state_dict(target_encoder_pretrained_dict_not_ddp)
-            logger.info(f'Correctly loaded pretrained target encoder from epoch {epoch} with msg: {msg}')
+    # -- loading target_encoder
+    target_encoder_pretrained_dict = checkpoint['target_encoder']
+    target_encoder_pretrained_dict_not_ddp = convert_from_ddp_to_normal_state_dict(target_encoder_pretrained_dict)
+    msg = target_encoder.load_state_dict(target_encoder_pretrained_dict_not_ddp, strict=True)
+    if dinov3_ckpt:
+        # Override the forward function of the target encoder model with a custom forward function
+        # Necessary when loading a pre-trained DinoV3 model to be used as the target encoder
+        target_encoder.forward = target_encoder_forward_dinov3.__get__(target_encoder)
+    logger.info(f'Correctly loaded pretrained target encoder from epoch {epoch} with msg: {msg}')
 
-        if dinov3_ckpt:
-            # Override the forward function of the target encoder model with a custom forward function (specific when using DinoV3 models)
-            target_encoder.forward = target_encoder_forward_dinov3.__get__(target_encoder)
+    # -- loading the optimizer if it exists and it is not null
+    if (optimizer and ('opt' in checkpoint) and checkpoint['opt']):
+        optimizer.load_state_dict(checkpoint['opt'])
+        logger.info(f'Loaded optimizer from epoch {epoch}')
 
-        # -- loading optimizer
-        if (opt and ('opt' in checkpoint) and checkpoint['opt']):
-            opt.load_state_dict(checkpoint['opt'])
-            logger.info(f'Loaded optimizer from epoch {epoch}')
+    # -- loading the scaler if it exists and it is not null
+    if (scaler and ('scaler' in checkpoint) and checkpoint['scaler']):
+        scaler.load_state_dict(checkpoint['scaler'])
+        logger.info(f'Loaded scaler from the checkpoint. Epoch {epoch}')
+    
+    logger.info(f'Correctly loaded the weights of the models from the checkpoint saved at the path: {checkpoint_path}')
+    del checkpoint
 
-        if (scaler and ('scaler' in checkpoint) and checkpoint['scaler']):
-            scaler.load_state_dict(checkpoint['scaler'])
-            logger.info(f'Loaded scaler from epoch {epoch}')
-        
-        logger.info(f'Read checkpoint from path: {r_path}')
-        del checkpoint
-
-    except Exception as e:
-        logger.info(f'Encountered exception when loading checkpoint {e}')
-        epoch = 0
-
-    return encoder, predictor, target_encoder, opt, scaler, epoch
+    return {
+        "encoder": encoder,
+        "predictor": predictor,
+        "target_encoder": target_encoder,
+        "optimizer": optimizer,
+        "scaler": scaler,
+        "epoch": epoch
+    }
 
 
 def init_model_dinov3(
@@ -113,11 +132,15 @@ def init_model_dinov3(
         predictor_num_heads: int,
         target_encoder_model_name: str,
         target_encoder_weights_path: str) -> Dict[str, object]:
+    
+    
+    assert encoder_model_name == target_encoder_model_name, "Both the encoder and the target encoder should have the same architecture"
+    assert encoder_weights_path == target_encoder_weights_path, "Both the encoder and the target encoder should be initialized with identical weights"
 
     dinov3_github_location = "facebookresearch/dinov3"
 
     # -- Initializing encoder
-    # Dinov3 VitS model
+    # Dinov3 model
     encoder = torch.hub.load(
         repo_or_dir=dinov3_github_location,
         model=encoder_model_name,
@@ -128,30 +151,30 @@ def init_model_dinov3(
     logger.info(f'Correctly initialized pretrained encoder (DinoV3 checkpoint)!')
 
     # -- Initializing predictor
-    # Pre-trained IJepa checkpoint predictor model
+    # Will be used for loading a pre-trained IJepa predictor 
     predictor = vit.__dict__['vit_predictor'](
         num_patches=predictor_num_patches,
-        embed_dim=encoder_embed_dim,
-        predictor_embed_dim=predictor_embed_dim,
+        embed_dim=encoder_embed_dim, # embedding dimension of the encoder
+        predictor_embed_dim=predictor_embed_dim, # embedding dimension of the predictor
         depth=predictor_depth,
         num_heads=predictor_num_heads
     )
-
     for m in predictor.modules():
         init_weights(m)
-
     predictor.to(device=device)
-    logger.info(f'Correctly initialized pretrained predictor (IJepa checkpoint)!')
+    logger.info(f'Correctly initialized pretrained predictor (to load the weights from an IJepa checkpoint)!')
 
-    # -- Initializing target_encoder
+    # -- Initializing target encoder
+    # Dinov3 model - the same architecture and the same checkpoint used as the encoder model
     target_encoder = torch.hub.load(
         repo_or_dir=dinov3_github_location,
-        model=target_encoder_model_name,
+        model=target_encoder_model_name, # should be the same as encoder_model_name
         source="github",
-        weights=target_encoder_weights_path
+        weights=target_encoder_weights_path # should be the same as encoder_weights_path
     )
     target_encoder.to(device=device)
     logger.info(f'Correctly initialized a pretrained target encoder (DinoV3 checkpoint)!')
+
 
     return {
         "encoder": encoder,
