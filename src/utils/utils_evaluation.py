@@ -4,6 +4,7 @@ import numpy as np
 from torch.utils.data import Dataset
 from PIL import Image
 import os
+import statistics
 import glob
 import torch
 from src.masks.multiblock import MaskCollator
@@ -128,7 +129,7 @@ def transform_from_mask_to_box(
 
     for patch_idx in range(num_patches):
         if torch.isin(patch_idx, mask).item():
-            row = patch_idx // num_patches_height
+            row = patch_idx // num_patches_width
             col = patch_idx % num_patches_width
             arr_mask[
                 row * patch_size: (row + 1) * patch_size,
@@ -174,7 +175,7 @@ def sample_context(
         end_width = start_width + context_width
 
         encoder_mask = torch.zeros((image_height, image_width), dtype=torch.int32)
-        encoder_mask[start_height:end_height, start_width:end_width] = 1
+        encoder_mask[start_height: end_height, start_width: end_width] = 1
         encoder_mask = torch.nonzero(encoder_mask.flatten())
         encoder_mask = encoder_mask.squeeze()
 
@@ -198,17 +199,20 @@ def build_anomaly_map(
     num_patches_width = image_width // patch_size
 
     anomaly_map = np.zeros((image_height, image_width))
-    for patch_idx, l2_distances in per_patch_l2_distances_dict:
-        mean_l2_distance = l2_distances.mean()
-        row = patch_idx // num_patches_width
-        col = patch_idx % num_patches_width
-        anomaly_map[row: row + patch_size, col: col + patch_size] = mean_l2_distance
+    for patch_idx, l2_distances in per_patch_l2_distances_dict.items():
+        if len(l2_distances) > 0:
+            mean_l2_distance = statistics.mean(l2_distances)
+            row = patch_idx // num_patches_width
+            col = patch_idx % num_patches_width
+            anomaly_map[
+                row * patch_size: (row + 1) * patch_size,
+                col * patch_size: (col + 1) * patch_size] = mean_l2_distance
 
     return anomaly_map
 
 
 class SegmentationWithLabelDataset(Dataset):
-    def __init__(self, images_dir, transform=None, mask_transform=None, is_train_dataset=False):
+    def __init__(self, images_dir, transform=None, mask_transform=None):
         self.images_dir = images_dir
         self.transform = transform
         self.mask_transform = mask_transform
@@ -218,12 +222,9 @@ class SegmentationWithLabelDataset(Dataset):
         self.images = [img_path for img_path in self.all_paths if 'label' not in img_path]
         self.image_names = [img_path.split("/")[-1] for img_path in self.images]
 
-        # masks
-        if not is_train_dataset:
-            self.masks = [img_path.replace("img", "label") for img_path in self.images]
-        else:
-            self.masks = [None] * len(self.images)
-
+        # segmentation masks
+        self.masks = [img_path.replace("img", "label") for img_path in self.images]
+            
         # labels     
         self.labels_names = [img_path.split("/")[8] for img_path in self.images]
         self.labels = [label2idx[label_name] for label_name in self.labels_names]
@@ -240,17 +241,49 @@ class SegmentationWithLabelDataset(Dataset):
         # load mask
         mask_path = self.masks[idx]
         mask = Image.open(mask_path).convert("L")
-
+            
         # load label
         label = self.labels[idx]
 
         # apply transforms
         if self.transform:
             image = self.transform(image)
-        if mask and self.mask_transform:
+        if self.mask_transform:
             mask = self.mask_transform(mask)
 
         return image, mask, label, img_name
     
 
+class LabelDataset(Dataset):
+    # This dataset does not include segmentation masks
+    def __init__(self, images_dir, transform=None):
+        self.images_dir = images_dir
+        self.transform = transform
+
+        # images
+        self.all_paths = sorted(glob.glob(os.path.join(images_dir, "**/*.png"), recursive=True))
+        self.images = [img_path for img_path in self.all_paths if 'label' not in img_path]
+        self.image_names = [img_path.split("/")[-1] for img_path in self.images]
+            
+        # labels     
+        self.labels_names = [img_path.split("/")[8] for img_path in self.images]
+        self.labels = [label2idx[label_name] for label_name in self.labels_names]
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        # load image
+        img_path = self.images[idx]
+        img_name = self.image_names[idx]
+        image = Image.open(img_path).convert("RGB")
+            
+        # load label
+        label = self.labels[idx]
+
+        # apply transforms
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label, img_name
 

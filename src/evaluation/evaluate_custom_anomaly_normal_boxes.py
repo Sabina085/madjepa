@@ -88,7 +88,7 @@ def main():
     predictor = dict_models["predictor"]
     target_encoder = dict_models["target_encoder"]
 
-    # Load the I-Jepa pre-trained checkpoint
+    # Load the pre-trained checkpoint (encoder + target encoder - DinoV3 VitS, predictor - IJepa checkpoint)
     print(f"Loading checkpoint from: {CKPT_PATH}")
     loaded_dict_from_checkpoint = load_models_from_checkpoint(
         checkpoint_path=CKPT_PATH,
@@ -104,17 +104,20 @@ def main():
     target_encoder = loaded_dict_from_checkpoint["target_encoder"]
 
     # Load the validation dataset
-    input_transforms = transforms.Compose([
-        # need to add normalization transformation
+    image_transform = transforms.Compose([
+        transforms.Resize((crop_size, crop_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.1129, 0.1240, 0.1445), std=(0.0392, 0.0495, 0.0612)),
+    ])
+    mask_transform = transforms.Compose([
         transforms.Resize((crop_size, crop_size)),
         transforms.ToTensor()
     ])
     
     val_dataset = SegmentationWithLabelDataset(
         images_dir=VALIDATION_DATASET_PATH,
-        transform=input_transforms,
-        mask_transform=input_transforms,
-        is_train_dataset=False)
+        transform=image_transform,
+        mask_transform=mask_transform)
 
     val_loader = torch.utils.data.DataLoader(
         dataset=val_dataset,
@@ -265,7 +268,7 @@ def main():
                 # --- Compute the metrics
 
                 # L2 distance between the predicted and target patch-level representations (embeddings) for the anomaly and normal boxes
-                l2 = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, dim=(1, 2))
+                l2 = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=(1, 2))
                 
                 # Get the L2 distance between the patch-level representations (embeddings) for the anomaly box (as it was the first element in `list_masks_target_encoder`)
                 list_l2_anomaly.append(l2[0].item())

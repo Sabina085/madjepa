@@ -23,8 +23,13 @@ def make_transforms(
     horizontal_flip=False,
     color_distortion=False,
     gaussian_blur=False,
-    normalization=((0.485, 0.456, 0.406),
-                   (0.229, 0.224, 0.225))
+    # BrainMRI normalization statistics
+    normalization=((0.1129, 0.1240, 0.1445),
+                   (0.0392, 0.0495, 0.0612))
+    
+    # ImageNet normalization statistics
+    # normalization=((0.485, 0.456, 0.406),
+    #                (0.229, 0.224, 0.225))
 ):
     logger.info('making imagenet data transforms')
 
@@ -47,7 +52,7 @@ def make_transforms(
     if gaussian_blur:
         transform_list += [GaussianBlur(p=0.5)]
     transform_list += [transforms.ToTensor()]
-    # transform_list += [transforms.Normalize(normalization[0], normalization[1])]
+    transform_list += [transforms.Normalize(mean=normalization[0], std=normalization[1])]
 
     transform = transforms.Compose(transform_list)
     return transform

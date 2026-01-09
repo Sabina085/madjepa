@@ -55,7 +55,7 @@ from src.transforms_brain_mri import make_transforms
 # --
 log_timings = True
 log_freq = 10
-checkpoint_freq = 50
+checkpoint_freq = 5
 # --
 
 _GLOBAL_SEED = 42
@@ -325,8 +325,8 @@ def main(args):
 
         if rank == 0:
             torch.save(save_dict, latest_path)
-            if (epoch + 1) % checkpoint_freq == 0:
-                torch.save(save_dict, save_path.format(epoch=f'{epoch + 1}'))
+            if epoch % checkpoint_freq == 0:
+                torch.save(save_dict, save_path.format(epoch=f'{epoch}'))
 
     # -- TRAINING LOOP
     print(f"Started training for {num_epochs} epochs...")
@@ -441,6 +441,9 @@ def main(args):
         # -- Save Checkpoint after every epoch
         logger.info('avg. loss %.3f' % loss_meter.avg)
         save_checkpoint(epoch + 1)
+
+    if torch.distributed.is_initialized():
+        torch.distributed.destroy_process_group()
 
 
 if __name__ == "__main__":

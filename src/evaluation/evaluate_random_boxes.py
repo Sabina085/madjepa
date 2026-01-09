@@ -17,13 +17,19 @@ from src.masks.utils import apply_masks
 from src.utils.tensors import repeat_interleave_batch
 from src.masks.multiblock import MaskCollator
 
+subpath_list = os.getcwd().split(os.sep)
+root_directory_path = os.path.join(*subpath_list[:-1])
+current_dir = subpath_list[-1]
 
-CONFIG_PATH = "/home/vhondru/istoian/ijepa-anomaly-detection/configs/brain_mri_dinov3_vits16.yaml"
-CKPT_PATH = "/home/vhondru/istoian/ijepa-anomaly-detection/experiments/enc_vits16_dinov3_pred_vith14_ijepa_target_vits16_dinov3/checkpoints/jepa-brain-mri-dinov3-vits16-latest.pth.tar"
-VALIDATION_DATASET_PATH = "/home/vhondru/istoian/BMAD/dataset/BraTS2021_slice/valid"
-RANDOM_BOXES_PATH = "/home/vhondru/istoian/ijepa-anomaly-detection/experiments/enc_vits16_dinov3_pred_vith14_ijepa_target_vits16_dinov3/random_boxes"
-RESULTS_CSV_PATH = "/home/vhondru/istoian/ijepa-anomaly-detection/experiments/enc_vits16_dinov3_pred_vith14_ijepa_target_vits16_dinov3/l2_distance_random_box_multiple_seeds.csv"
-NUM_TARGET_BOXES_PER_IMAGE = 30
+CONFIG_PATH = f"/{root_directory_path}/{current_dir}/configs/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3.yaml"
+CKPT_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/checkpoints/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3-latest.pth.tar"
+VALIDATION_DATASET_PATH = f"/{root_directory_path}/BMAD/dataset/BraTS2021_slice/valid"
+RANDOM_BOXES_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/random_boxes"
+ANOMALY_MAPS_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/anomaly_maps"
+
+RESULTS_CSV_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/l2_distance_random_box_multiple_seeds.csv"
+
+NUM_TARGET_BOXES_PER_IMAGE = 2
 
 def main():
     # Set up the device
@@ -37,23 +43,35 @@ def main():
 
     # Read the configuration file (which was used for generating the checkpoint)
     print("Config file: ", config)
+    # Read the configuration file (which was used for generating the checkpoint)
+    # --- context encoder
     encoder_model_name = config["meta"]["encoder_model_name"]
-    target_encoder_model_name = config["meta"]["target_encoder_model_name"]
-    encoder_weights_path = config["meta"]["encoder_weights_path"]
-    target_encoder_weights_path = config["meta"]["target_encoder_weights_path"]
-    predictor_depth = config["meta"]["predictor_depth"]
+    encoder_weights_path = config["meta"]["encoder_weights_source"]
     encoder_embed_dim = config["meta"]["encoder_embed_dim"]
+
+    # --- target encoder
+    target_encoder_model_name = config["meta"]["target_encoder_model_name"]
+    target_encoder_weights_path = config["meta"]["target_encoder_weights_source"]
+
+    # --- predictor
+    predictor_depth = config["meta"]["predictor_depth"]
+    predictor_num_heads = config["meta"]["predictor_num_heads"]
     predictor_embed_dim = config["meta"]["predictor_embed_dim"]
+
+    # --- data transforms
     crop_size = config["data"]["crop_size"]
     patch_size = config["mask"]["patch_size"]
-    predictor_num_heads = config["meta"]["predictor_num_heads"]
-    target_block_scale=config["mask"]["pred_mask_scale"]
-    target_block_aspect_ratio=config["mask"]["aspect_ratio"]
-    enc_mask_scale = config["mask"]["aspect_ratio"]
-    enc_mask_aspect_ratio = config["mask"]["aspect_ratio"]
-    min_keep = config["mask"]["min_keep"]
 
-    # Init DinoV3/I-Jepa models
+    # -- target blocks / masks
+    target_block_scale = config["mask"]["pred_mask_scale"]
+    target_block_aspect_ratio = config["mask"]["pred_mask_aspect_ratio"]
+
+    # --- context block / mask
+    enc_mask_scale = config["mask"]["enc_mask_scale"]
+    enc_mask_aspect_ratio = config["mask"]["enc_mask_aspect_ratio"]
+    enc_min_keep = config["mask"]["enc_min_keep"]
+
+    # Init DinoV3/I-Jepa models: (context) encoder (DinoV3) + predictor (I-Jepa checkpoint) + target_encoder (DinoV3 - same architecture as the context encoder)
     dict_models = init_model_dinov3(
         device=device,
         encoder_model_name=encoder_model_name,
@@ -70,28 +88,36 @@ def main():
     predictor = dict_models["predictor"]
     target_encoder = dict_models["target_encoder"]
 
-    # Load the Dinov3 pre-trained checkpoint
+    # Load the pre-trained checkpoint (encoder + target encoder - DinoV3 VitS, predictor - IJepa checkpoint)
     print(f"Loading checkpoint from: {CKPT_PATH}")
-    encoder, predictor, target_encoder, _, _, _ = load_models_from_checkpoint(
+    loaded_dict_from_checkpoint = load_models_from_checkpoint(
         checkpoint_path=CKPT_PATH,
         encoder=encoder,
         predictor=predictor,
         target_encoder=target_encoder,
         optimizer=None,
-        scaler=None
+        scaler=None,
+        dinov3_ckpt=True
     )
+    encoder = loaded_dict_from_checkpoint["encoder"]
+    predictor = loaded_dict_from_checkpoint["predictor"]
+    target_encoder = loaded_dict_from_checkpoint["target_encoder"]
 
-    # Load the BrainMRI validation dataset
-    input_transforms = transforms.Compose([
-        transforms.Resize((crop_size, crop_size)), # or transforms.CenterCrop(crop_size)
+    # Load the validation dataset
+    image_transform = transforms.Compose([
+        transforms.Resize((crop_size, crop_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.1129, 0.1240, 0.1445), std=(0.0392, 0.0495, 0.0612)),
+    ])
+    mask_transform = transforms.Compose([
+        transforms.Resize((crop_size, crop_size)),
         transforms.ToTensor()
     ])
-
+    
     val_dataset = SegmentationWithLabelDataset(
         images_dir=VALIDATION_DATASET_PATH,
-        transform=input_transforms,
-        mask_transform=input_transforms,
-        is_train_dataset=False)
+        transform=image_transform,
+        mask_transform=mask_transform)
 
     val_loader = torch.utils.data.DataLoader(
         dataset=val_dataset,
@@ -108,11 +134,16 @@ def main():
 
     list_box_sizes = []
     list_image_names = []
+    list_segmentation_masks = []
     list_l2_distances_per_image = []
     list_labels = []
     list_seeds = []
+
+    # -- useful for building the anomaly map
     num_patches = (crop_size // patch_size) * (crop_size // patch_size)
-    per_patch_l2_distances = {patch_idx: [] for patch_idx in range(num_patches)}
+    image_per_patch_l2_distances = {}
+    # --
+    
     for box_idx in tqdm(range(NUM_TARGET_BOXES_PER_IMAGE)):
         seed = box_idx
         g = torch.Generator()
@@ -126,7 +157,10 @@ def main():
         for _, (images, segmentation_masks, labels, image_name) in enumerate(val_loader):
             images = images.to(device)
             labels = labels.to(device)
+            image_name = image_name[0].split('.')[0]
             segmentation_masks = np.squeeze(np.array(segmentation_masks))
+            if box_idx == 0:
+                image_per_patch_l2_distances[image_name] = {patch_idx: [] for patch_idx in range(num_patches)}
 
             dict_mask_target_encoder = get_random_box(
                 image_height=crop_size,
@@ -161,7 +195,7 @@ def main():
                 image_width=crop_size,
                 patch_size=patch_size,
                 target_masks=[random_mask_target_encoder],
-                min_keep=min_keep
+                min_keep=enc_min_keep
             ).to(device)]
 
             # Save the image using the encoder context mask
@@ -193,20 +227,22 @@ def main():
 
                 l2_per_image = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, dim=(1, 2))
                 
-                list_image_names.append(image_name[0].split('.')[0])
+                list_image_names.append(image_name)
                 list_box_sizes.append((target_block_h * patch_size, target_block_w * patch_size))
                 list_l2_distances_per_image.append(l2_per_image.item())
                 list_labels.append(labels.item())
                 list_seeds.append(seed)
+                list_segmentation_masks.append(segmentation_masks)
 
                 # Get L2 distances per patch embedding for building an anomaly map
                 l2_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, dim=2)
                 for mask in list_masks_target_encoder:
+                    mask = torch.squeeze(mask)
                     indices_mask_target = mask.tolist()
                     for idx_tensor, index_patch in enumerate(indices_mask_target):
-                        per_patch_l2_distances[index_patch] += [l2_per_patch[idx_tensor].item()]
-
-            
+                        image_per_patch_l2_distances[image_name][index_patch] += [l2_per_patch[0, idx_tensor].item()]
+                
+    
     df = pd.DataFrame({
         "image_name": list_image_names,
         "label": list_labels,
@@ -216,6 +252,16 @@ def main():
     })
     df.to_csv(RESULTS_CSV_PATH, index=False)
 
+    for image_name, segmentation_mask in zip(list_image_names, list_segmentation_masks):
+        anomaly_map = build_anomaly_map(
+            per_patch_l2_distances_dict=image_per_patch_l2_distances[image_name],
+            image_height=crop_size,
+            image_width=crop_size,
+            patch_size=patch_size
+        )
+        Image.fromarray((255 * anomaly_map).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_PATH}/{image_name}_anomaly_map.png")
+        segmentation_mask = np.squeeze(np.array(segmentation_mask))
+        Image.fromarray((segmentation_mask * 255).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_PATH}/{image_name}_segmentation.png")
 
 if __name__ == "__main__":
     main()
