@@ -26,10 +26,9 @@ CKPT_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3
 VALIDATION_DATASET_PATH = f"/{root_directory_path}/BMAD/dataset/BraTS2021_slice/valid"
 RANDOM_BOXES_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/random_boxes"
 ANOMALY_MAPS_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/anomaly_maps"
-
 RESULTS_CSV_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/l2_distance_random_box_multiple_seeds.csv"
 
-NUM_TARGET_BOXES_PER_IMAGE = 2
+NUM_TARGET_BOXES_PER_IMAGE = 30
 
 def main():
     # Set up the device
@@ -173,11 +172,11 @@ def main():
             random_box = dict_mask_target_encoder["random_box"]
 
             image_arr = images[0, :, :, :].detach().cpu().numpy()
-            Image.fromarray((255 * np.transpose(image_arr, (1, 2, 0))).astype("uint8")).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name[0].split('.')[0]}_image.png")
+            Image.fromarray((255 * np.transpose(image_arr, (1, 2, 0))).astype("uint8")).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_image.png")
  
             pixels_anomaly_mask = np.repeat(np.expand_dims(dict_mask_target_encoder["pixels_random_mask"], axis=0), 3, axis=0).astype("uint8")
             masked_image = np.transpose((255 * image_arr * pixels_anomaly_mask).astype(np.uint8), (1, 2, 0))
-            Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name[0].split('.')[0]}_random_pixels_mask_image_{seed}.png")
+            Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_random_pixels_mask_image_{seed}.png")
 
             random_mask_target_encoder = transform_from_target_box_to_mask(
                 image_height=crop_size,
@@ -208,7 +207,7 @@ def main():
             )
             encoder_context_mask = np.repeat(np.expand_dims(encoder_context_mask_arr, axis=0), 3, axis=0).astype("uint8")
             masked_image = np.transpose((255 * image_arr * encoder_context_mask).astype(np.uint8), (1, 2, 0))
-            Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name[0].split('.')[0]}_context_image_{seed}.png")
+            Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_context_image_{seed}.png")
         
             encoder.eval()
             target_encoder.eval()
