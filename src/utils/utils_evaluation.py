@@ -190,6 +190,26 @@ def sample_context(
         else:
             it += 1
 
+def zscore_sigmoid(anomaly_map, eps=1e-8):
+    """
+    Z-score + sigmoid normalization for a 2D NumPy anomaly map.
+
+    Args:
+        anomaly_map (np.ndarray): 2D array of real-valued anomaly scores
+        eps (float): numerical stability constant
+
+    Returns:
+        np.ndarray: anomaly map normalized to [0, 1]
+    """
+
+    anomaly_map = anomaly_map.astype(np.float32)
+    mean = anomaly_map.mean()
+    std = anomaly_map.std()
+
+    z = (anomaly_map - mean) / (std + eps)
+
+    return 1.0 / (1.0 + np.exp(-z))
+
 def build_anomaly_map(
         per_patch_l2_distances_dict: Dict[str, List[float]],
         image_height: int,
@@ -207,7 +227,7 @@ def build_anomaly_map(
             anomaly_map[
                 row * patch_size: (row + 1) * patch_size,
                 col * patch_size: (col + 1) * patch_size] = mean_l2_distance
-
+    
     return anomaly_map
 
 
@@ -245,7 +265,7 @@ class SegmentationWithLabelDataset(Dataset):
         # load label
         label = self.labels[idx]
 
-        # apply transforms
+        # apply transformations
         if self.transform:
             image = self.transform(image)
         if self.mask_transform:
@@ -255,7 +275,7 @@ class SegmentationWithLabelDataset(Dataset):
     
 
 class LabelDataset(Dataset):
-    # This dataset does not include segmentation masks
+    # This is a simpler version of the dataset. It does not include segmentation masks, only the image and the label.
     def __init__(self, images_dir, transform=None):
         self.images_dir = images_dir
         self.transform = transform

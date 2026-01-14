@@ -28,7 +28,10 @@ RANDOM_BOXES_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits1
 ANOMALY_MAPS_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/anomaly_maps"
 RESULTS_CSV_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/l2_distance_random_box_multiple_seeds.csv"
 
+# How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
+# If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
+SAVE_IMAGES_WITH_MASKS = True
 
 def main():
     # Set up the device
@@ -40,9 +43,7 @@ def main():
     with open(CONFIG_PATH, "r") as f:
         config = yaml.safe_load(f)
 
-    # Read the configuration file (which was used for generating the checkpoint)
-    print("Config file: ", config)
-    # Read the configuration file (which was used for generating the checkpoint)
+    # Read the configuration file (which was used for training the checkpoint)
     # --- context encoder
     encoder_model_name = config["meta"]["encoder_model_name"]
     encoder_weights_path = config["meta"]["encoder_weights_source"]
@@ -112,6 +113,15 @@ def main():
         transforms.Resize((crop_size, crop_size)),
         transforms.ToTensor()
     ])
+
+    inverse_image_transform = transforms.Compose([
+        transforms.Normalize(mean = [ 0.0, 0.0, 0.0],
+                             std = [ 1.0 / 0.0392, 1.0 / 0.0495, 1.0 / 0.0612],
+                             inplace=False),
+        transforms.Normalize(mean = [ -0.1129, -0.1240, -0.1445],
+                             std = [ 1.0, 1.0, 1.0],
+                             inplace=False)
+        ])
     
     val_dataset = SegmentationWithLabelDataset(
         images_dir=VALIDATION_DATASET_PATH,
@@ -125,11 +135,12 @@ def main():
     
     print("Number of validation samples: ", len(val_loader))
 
-    # Sample the size of a target block
+    # Used for sampling the size of a target block
     mc = MaskCollator(
         input_size=(crop_size, crop_size),
         patch_size=patch_size
     )
+    g = torch.Generator()
 
     list_box_sizes = []
     list_image_names = []
@@ -138,14 +149,13 @@ def main():
     list_labels = []
     list_seeds = []
 
-    # -- useful for building the anomaly map
+    # -- used for building the anomaly map
     num_patches = (crop_size // patch_size) * (crop_size // patch_size)
     image_per_patch_l2_distances = {}
     # --
     
     for box_idx in tqdm(range(NUM_TARGET_BOXES_PER_IMAGE)):
         seed = box_idx
-        g = torch.Generator()
         g.manual_seed(seed)
 
         target_block_h, target_block_w = mc._sample_block_size(
@@ -158,6 +168,7 @@ def main():
             labels = labels.to(device)
             image_name = image_name[0].split('.')[0]
             segmentation_masks = np.squeeze(np.array(segmentation_masks))
+
             if box_idx == 0:
                 image_per_patch_l2_distances[image_name] = {patch_idx: [] for patch_idx in range(num_patches)}
 
@@ -170,13 +181,6 @@ def main():
                 seed=seed
             )
             random_box = dict_mask_target_encoder["random_box"]
-
-            image_arr = images[0, :, :, :].detach().cpu().numpy()
-            Image.fromarray((255 * np.transpose(image_arr, (1, 2, 0))).astype("uint8")).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_image.png")
- 
-            pixels_anomaly_mask = np.repeat(np.expand_dims(dict_mask_target_encoder["pixels_random_mask"], axis=0), 3, axis=0).astype("uint8")
-            masked_image = np.transpose((255 * image_arr * pixels_anomaly_mask).astype(np.uint8), (1, 2, 0))
-            Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_random_pixels_mask_image_{seed}.png")
 
             random_mask_target_encoder = transform_from_target_box_to_mask(
                 image_height=crop_size,
@@ -198,50 +202,75 @@ def main():
             ).to(device)]
 
             # Save the image using the encoder context mask
-
             encoder_context_mask_arr = transform_from_mask_to_box(
                 image_height=crop_size,
                 image_width=crop_size,
                 mask=encoder_mask[0],
                 patch_size=patch_size,
             )
-            encoder_context_mask = np.repeat(np.expand_dims(encoder_context_mask_arr, axis=0), 3, axis=0).astype("uint8")
-            masked_image = np.transpose((255 * image_arr * encoder_context_mask).astype(np.uint8), (1, 2, 0))
-            Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_context_image_{seed}.png")
+
+            if SAVE_IMAGES_WITH_MASKS:
+                if not os.path.exists(RANDOM_BOXES_PATH):
+                    os.makedirs(RANDOM_BOXES_PATH, exist_ok=True)
+                ### Code used for saving the generated input boxes (not essential, can be removed) - start
+                # Saving the original input image (unmasked)
+                image_arr = inverse_image_transform(images[0, :, :, :]).detach().cpu().numpy()
+                Image.fromarray((255 * np.transpose(image_arr, (1, 2, 0))).astype("uint8")).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_image.png")
+                Image.fromarray((255 * np.transpose(images[0, :, :, :].detach().cpu().numpy(), (1, 2, 0))).astype("uint8")).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_normalized_image.png")
+    
+                # Saving the input image masked using the sampled random box (only the pixels inside the random box are visible)
+                pixels_random_mask = np.repeat(np.expand_dims(dict_mask_target_encoder["pixels_random_mask"], axis=0), 3, axis=0).astype("uint8")
+                masked_image = np.transpose((255 * image_arr * pixels_random_mask).astype(np.uint8), (1, 2, 0))
+                Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_random_pixels_mask_image_{seed}.png")
+
+                # Save the image with the encoder masked context
+                encoder_context_mask = np.repeat(np.expand_dims(encoder_context_mask_arr, axis=0), 3, axis=0).astype("uint8")
+                masked_image = np.transpose((255 * image_arr * encoder_context_mask).astype(np.uint8), (1, 2, 0))
+                Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_context_image_{seed}.png")
+                ### Code used only for saving the images - end
         
             encoder.eval()
             target_encoder.eval()
             predictor.eval()
+
             with torch.no_grad():
+                # --- Target encoder forward prop
+                # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
                 target_encoder_emb = target_encoder.forward(images)
                 # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
                 # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                # retrieve the batch size
                 B = len(target_encoder_emb)
                 
+                # Retrieve the embeddings only for the mask patches 
                 target_encoder_emb = apply_masks(target_encoder_emb, list_masks_target_encoder)
                 target_encoder_emb = repeat_interleave_batch(target_encoder_emb, B, repeat=1)
 
+                # --- (Context) Encoder forward prop
                 encoder_emb = encoder.forward(images, encoder_mask)
+
+                # --- Predictor forward prop
                 predictor_emb = predictor.forward(encoder_emb, encoder_mask, list_masks_target_encoder)
 
-                l2_per_image = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, dim=(1, 2))
-                
+                # --- Compute the metrics
+                # L2 distance between the predicted and target patch-level representations (embeddings) for the random box
+                l2_per_image = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=(1, 2))
+                list_l2_distances_per_image.append(l2_per_image.item())
+
                 list_image_names.append(image_name)
                 list_box_sizes.append((target_block_h * patch_size, target_block_w * patch_size))
-                list_l2_distances_per_image.append(l2_per_image.item())
                 list_labels.append(labels.item())
                 list_seeds.append(seed)
                 list_segmentation_masks.append(segmentation_masks)
 
                 # Get L2 distances per patch embedding for building an anomaly map
-                l2_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, dim=2)
+                l2_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
                 for mask in list_masks_target_encoder:
                     mask = torch.squeeze(mask)
                     indices_mask_target = mask.tolist()
                     for idx_tensor, index_patch in enumerate(indices_mask_target):
                         image_per_patch_l2_distances[image_name][index_patch] += [l2_per_patch[0, idx_tensor].item()]
-                
-    
+
     df = pd.DataFrame({
         "image_name": list_image_names,
         "label": list_labels,
@@ -251,14 +280,27 @@ def main():
     })
     df.to_csv(RESULTS_CSV_PATH, index=False)
 
-    for image_name, segmentation_mask in zip(list_image_names, list_segmentation_masks):
+    anomaly_maps = []
+    for image_name in list_image_names:
         anomaly_map = build_anomaly_map(
             per_patch_l2_distances_dict=image_per_patch_l2_distances[image_name],
             image_height=crop_size,
             image_width=crop_size,
             patch_size=patch_size
         )
-        Image.fromarray((255 * anomaly_map).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_PATH}/{image_name}_anomaly_map.png")
+        anomaly_maps.append(anomaly_map)
+
+    # For visualisation purposes
+    # MIN-MAX scaling to convert the pixels in the [0, 1] range so that we can display the anomaly maps
+    # Compute the min, max statistics at the dataset level
+    if not os.path.exists(ANOMALY_MAPS_PATH):
+        os.makedirs(ANOMALY_MAPS_PATH, exist_ok=True)
+
+    max_patch_value = max([np.max(anomaly_map) for anomaly_map in anomaly_maps])
+    min_patch_value = min([np.min(anomaly_map) for anomaly_map in anomaly_maps])
+    for anomaly_map, segmentation_mask, image_name in zip(anomaly_maps, list_segmentation_masks, list_image_names):
+        scaled_anomaly_map =  (anomaly_map - min_patch_value) / (max_patch_value - min_patch_value + 1e-8)
+        Image.fromarray((255 * scaled_anomaly_map).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_PATH}/{image_name}_anomaly_map.png")
         segmentation_mask = np.squeeze(np.array(segmentation_mask))
         Image.fromarray((segmentation_mask * 255).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_PATH}/{image_name}_segmentation.png")
 

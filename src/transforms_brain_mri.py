@@ -27,7 +27,7 @@ def make_transforms(
     normalization=((0.1129, 0.1240, 0.1445),
                    (0.0392, 0.0495, 0.0612))
     
-    # ImageNet normalization statistics
+    # ImageNet normalization statistics - need to check if they lead to better results
     # normalization=((0.485, 0.456, 0.406),
     #                (0.229, 0.224, 0.225))
 ):
@@ -70,3 +70,4 @@ class GaussianBlur(object):
 
         radius = self.radius_min + torch.rand(1) * (self.radius_max - self.radius_min)
         return img.filter(ImageFilter.GaussianBlur(radius=radius))
+    
