@@ -33,6 +33,8 @@ NUM_TARGET_BOXES_PER_IMAGE = 30
 # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
 SAVE_IMAGES_WITH_MASKS = True
 
+GAUSSIAN_FILTER_SIGMA = 4
+
 def main():
     # Set up the device
     if not torch.cuda.is_available():
@@ -105,12 +107,12 @@ def main():
 
     # Load the validation dataset
     image_transform = transforms.Compose([
-        transforms.Resize((crop_size, crop_size)),
+        transforms.Resize((crop_size, crop_size), Image.BICUBIC),
         transforms.ToTensor(),
         transforms.Normalize(mean=(0.1129, 0.1240, 0.1445), std=(0.0392, 0.0495, 0.0612)),
     ])
     mask_transform = transforms.Compose([
-        transforms.Resize((crop_size, crop_size)),
+        transforms.Resize((crop_size, crop_size), Image.NEAREST),
         transforms.ToTensor()
     ])
 
@@ -253,8 +255,9 @@ def main():
                 predictor_emb = predictor.forward(encoder_emb, encoder_mask, list_masks_target_encoder)
 
                 # --- Compute the metrics
-                # L2 distance between the predicted and target patch-level representations (embeddings) for the random box
-                l2_per_image = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=(1, 2))
+                # Average L2 distance between the predicted and target patch-level representations (embeddings) for the random box
+                l2_per_embedding = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
+                l2_per_image = torch.mean(input=l2_per_embedding, dim=1, keepdim=False)
                 list_l2_distances_per_image.append(l2_per_image.item())
 
                 list_image_names.append(image_name)
@@ -270,6 +273,12 @@ def main():
                     indices_mask_target = mask.tolist()
                     for idx_tensor, index_patch in enumerate(indices_mask_target):
                         image_per_patch_l2_distances[image_name][index_patch] += [l2_per_patch[0, idx_tensor].item()]
+
+        print("seed: ", seed)
+        print("Mean L2 anomaly images mean: ", statistics.mean(
+            [l2_dist for l2_dist, label in zip(list_l2_distances_per_image, list_labels) if label == 1]))
+        print("Mean L2 normal images mean: ", statistics.mean(
+            [l2_dist for l2_dist, label in zip(list_l2_distances_per_image, list_labels) if label == 0]))
 
     df = pd.DataFrame({
         "image_name": list_image_names,
@@ -298,11 +307,24 @@ def main():
 
     max_patch_value = max([np.max(anomaly_map) for anomaly_map in anomaly_maps])
     min_patch_value = min([np.min(anomaly_map) for anomaly_map in anomaly_maps])
-    for anomaly_map, segmentation_mask, image_name in zip(anomaly_maps, list_segmentation_masks, list_image_names):
+    for anomaly_map, segmentation_mask, image_name, label in zip(anomaly_maps, list_segmentation_masks, list_image_names, list_labels):
         scaled_anomaly_map =  (anomaly_map - min_patch_value) / (max_patch_value - min_patch_value + 1e-8)
         Image.fromarray((255 * scaled_anomaly_map).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_PATH}/{image_name}_anomaly_map.png")
         segmentation_mask = np.squeeze(np.array(segmentation_mask))
         Image.fromarray((segmentation_mask * 255).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_PATH}/{image_name}_segmentation.png")
+
+        scaled_anomaly_map = (scaled_anomaly_map * 255).astype(np.uint8)
+        scaled_anomaly_map = cvt2heatmap(scaled_anomaly_map)
+
+        label_subpath = "good" if label == 0 else "Ungood"
+        image_path = os.path.join(VALIDATION_DATASET_PATH, label_subpath, "img", image_name + ".png")
+        initial_image = cv2.imread(image_path)
+        initial_image = cv2.cvtColor(initial_image, cv2.COLOR_BGR2RGB)
+        initial_image = cv2.resize(initial_image, dsize=(crop_size, crop_size), interpolation=cv2.INTER_CUBIC)
+        initial_image = (initial_image * 255).astype(np.uint8)
+
+        heatmap = cv2.addWeighted(scaled_anomaly_map, 0.4, initial_image, (1 - 0.4), 0)
+        cv2.imwrite(f"{ANOMALY_MAPS_PATH}/{image_name}_heatmap.png", heatmap)
 
 if __name__ == "__main__":
     main()

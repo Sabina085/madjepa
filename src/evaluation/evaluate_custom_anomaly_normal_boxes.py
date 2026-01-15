@@ -105,12 +105,12 @@ def main():
 
     # Load the validation dataset
     image_transform = transforms.Compose([
-        transforms.Resize((crop_size, crop_size)),
+        transforms.Resize((crop_size, crop_size), Image.BICUBIC),
         transforms.ToTensor(),
         transforms.Normalize(mean=(0.1129, 0.1240, 0.1445), std=(0.0392, 0.0495, 0.0612)),
     ])
     mask_transform = transforms.Compose([
-        transforms.Resize((crop_size, crop_size)),
+        transforms.Resize((crop_size, crop_size), Image.NEAREST),
         transforms.ToTensor()
     ])
     inverse_image_transform = transforms.Compose([
@@ -279,8 +279,10 @@ def main():
                 predictor_emb = predictor.forward(encoder_emb, encoder_mask, list_masks_target_encoder)
 
                 # --- Compute the metrics
-                # L2 distance between the predicted and target patch-level representations (embeddings) for the anomaly and normal boxes
-                l2 = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=(1, 2))
+                # Average L2 distance between the predicted and target patch-level representations (embeddings) for the anomaly and normal boxes
+                # l2 = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=(1, 2))
+                l2_per_embedding = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
+                l2 = torch.mean(input=l2_per_embedding, dim=1, keepdim=False)
                 
                 # Get the L2 distance between the patch-level representations (embeddings) for the anomaly box (as it was the first element in `list_masks_target_encoder`)
                 list_l2_anomaly.append(l2[0].item())
@@ -292,8 +294,8 @@ def main():
                 box_sizes.append((target_block_h * patch_size, target_block_w * patch_size))
 
         print("seed: ", seed)
-        print("list_l2_anomaly mean: ", statistics.mean(list_l2_anomaly))
-        print("list_l2_normal_mean: ",statistics.mean(list_l2_normal))
+        print("Mean L2 anomaly mean: ", statistics.mean(list_l2_anomaly))
+        print("Mean L2 normal mean: ",statistics.mean(list_l2_normal))
 
     # Save the results
     df_results = pd.DataFrame({

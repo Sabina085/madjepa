@@ -6,6 +6,7 @@ from PIL import Image
 import os
 import statistics
 import glob
+import cv2
 import torch
 from src.masks.multiblock import MaskCollator
 
@@ -307,3 +308,6 @@ class LabelDataset(Dataset):
 
         return image, label, img_name
 
+def cvt2heatmap(gray):
+    heatmap = cv2.applyColorMap(gray, cv2.COLORMAP_JET)
+    return heatmap
