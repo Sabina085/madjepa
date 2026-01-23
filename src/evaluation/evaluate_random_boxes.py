@@ -219,7 +219,7 @@ def main():
                 patch_size=patch_size,
             )
 
-            if SAVE_IMAGES_WITH_MASKS:
+            if SAVE_IMAGES_WITH_MASKS and (seed == 0): # save examples of sampled boxes / images only for the first seed
                 if not os.path.exists(RANDOM_BOXES_PATH):
                     os.makedirs(RANDOM_BOXES_PATH, exist_ok=True)
                 ### Code used for saving the generated input boxes (not essential, can be removed) - start
@@ -313,9 +313,9 @@ def main():
             patch_size=patch_size,
             agg_strategy=AGGREGATE_PATCHES_STRATEGY
         )
-        anomaly_maps.append(anomaly_map)
         anomaly_map = gaussian_filter(anomaly_map, GAUSSIAN_FILTER_BLUR_SIGMA)
-
+        anomaly_maps.append(anomaly_map)
+        
     # For visualisation purposes
     # MIN-MAX scaling to convert the pixels in the [0, 1] range so that we can display the anomaly maps
     # Compute the min, max statistics at the dataset level
@@ -325,7 +325,9 @@ def main():
     max_patch_value = max([np.max(anomaly_map) for anomaly_map in anomaly_maps])
     min_patch_value = min([np.min(anomaly_map) for anomaly_map in anomaly_maps])
     for anomaly_map, segmentation_mask, image_name, label in zip(anomaly_maps, list_segmentation_masks, list_image_names, list_labels):
+        # Min-max scaling
         scaled_anomaly_map =  (anomaly_map - min_patch_value) / (max_patch_value - min_patch_value + 1e-8)
+        
         scaled_anomaly_map_path = f"{ANOMALY_MAPS_ARRAYS_PATH}/{image_name}_anomaly_map_label_{label}.npy"
         np.save(file=scaled_anomaly_map_path, arr=scaled_anomaly_map)
         segmentation_mask_path = scaled_anomaly_map_path.replace("_anomaly_map_", "_segmentation_mask_")
