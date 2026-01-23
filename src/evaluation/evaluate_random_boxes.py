@@ -33,7 +33,7 @@ GAUSSIAN_FILTER_BLUR_SIGMA = 4
 CONFIG_PATH = f"/{root_directory_path}/{current_dir}/configs/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3.yaml"
 CKPT_PATH = f"/{root_directory_path}/{current_dir}/experiments_{DATASET_NAME}/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/checkpoints/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3-latest.pth.tar"
 EVALUATION_DATASET_PATH = f"/{root_directory_path}/BMAD/dataset/{DATASET_NAME}/{SPLIT}"
-RANDOM_BOXES_PATH = f"/{root_directory_path}/{current_dir}/experiments_{DATASET_NAME}/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/results_{SPLIT}/random_boxes"
+RANDOM_BOXES_PATH = f"/{root_directory_path}/{current_dir}/experiments_{DATASET_NAME}/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/results_{SPLIT}/random_boxes_images"
 
 ANOMALY_MAPS_IMAGES_PATH = f"/{root_directory_path}/{current_dir}/experiments_{DATASET_NAME}/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/results_{SPLIT}/anomaly_maps_images_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}"
 ANOMALY_MAPS_ARRAYS_PATH = f"/{root_directory_path}/{current_dir}/experiments_{DATASET_NAME}/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/results_{SPLIT}/anomaly_maps_arrays_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}"
@@ -133,17 +133,17 @@ def main():
                              inplace=False)
         ])
     
-    val_dataset = SegmentationWithLabelDataset(
+    eval_dataset = SegmentationWithLabelDataset(
         images_dir=EVALUATION_DATASET_PATH,
         transform=image_transform,
         mask_transform=mask_transform)
 
-    val_loader = torch.utils.data.DataLoader(
-        dataset=val_dataset,
+    eval_loader = torch.utils.data.DataLoader(
+        dataset=eval_dataset,
         batch_size=1,
         shuffle=False)
     
-    print("Number of validation samples: ", len(val_loader))
+    print("Number of evaluation samples: ", len(eval_loader))
 
     # Used for sampling the size of a target block
     mc = MaskCollator(
@@ -173,11 +173,11 @@ def main():
             scale=target_block_scale,
             aspect_ratio_scale=target_block_aspect_ratio)
         
-        for _, (images, segmentation_masks, labels, image_name) in enumerate(val_loader):
+        for _, (images, segmentation_masks, labels, image_name) in enumerate(eval_loader):
             images = images.to(device)
             labels = labels.to(device)
             image_name = image_name[0].split('.')[0]
-            segmentation_masks = np.squeeze(np.array(segmentation_masks))
+            segmentation_masks = np.squeeze(np.asarray(segmentation_masks))
 
             if box_idx == 0:
                 image_per_patch_l2_distances[image_name] = {patch_idx: [] for patch_idx in range(num_patches)}

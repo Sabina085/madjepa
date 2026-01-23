@@ -73,7 +73,7 @@ def get_random_box(
     box_width *= patch_size
 
     np.random.seed(seed=seed)
-    random.seed(seed=seed)
+    random.seed(seed)
     height_sampling_locations = [
         x for x in range(0, image_height - box_height + 1, patch_size)
     ]
@@ -175,8 +175,8 @@ def sample_context(
             scale=enc_mask_scale,
             aspect_ratio_scale=aspect_ratio
         )
-        print("context_height: ", context_height)
-        print("context_width: ", context_width)
+        # print("context_height: ", context_height)
+        # print("context_width: ", context_width)
 
         np.random.seed(it)
         start_height = np.random.randint(low=0, high=image_height - context_height)
@@ -189,14 +189,14 @@ def sample_context(
         encoder_mask = torch.nonzero(encoder_mask.flatten())
         encoder_mask = encoder_mask.squeeze()
 
-        print("encoder_mask.shape before: ", encoder_mask.shape)
+        # print("encoder_mask.shape before: ", encoder_mask.shape)
         # Remove from the context the patches contained in the target boxes
         for target_mask in target_masks:
             # encoder_mask = torch.tensor(list(set(encoder_mask.tolist()) - set(target_mask.tolist())))
             # cleaner version
             encoder_mask = encoder_mask[~torch.isin(encoder_mask, target_mask)]
 
-        print("encoder_mask.shape after: ", encoder_mask.shape)
+        # print("encoder_mask.shape after: ", encoder_mask.shape)
         if encoder_mask.shape[0] >= min_keep:
             return torch.unsqueeze(encoder_mask, 0)
         else:
