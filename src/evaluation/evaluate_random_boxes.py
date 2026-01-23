@@ -4,8 +4,9 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from PIL import Image
+from pathlib import Path
+from scipy.ndimage import gaussian_filter
 
-import torch.nn.functional as F
 from torchvision import transforms
 
 from src.utils.utils_evaluation import *
@@ -21,19 +22,26 @@ subpath_list = os.getcwd().split(os.sep)
 root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
-CONFIG_PATH = f"/{root_directory_path}/{current_dir}/configs/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3.yaml"
-CKPT_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/checkpoints/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3-latest.pth.tar"
-VALIDATION_DATASET_PATH = f"/{root_directory_path}/BMAD/dataset/BraTS2021_slice/valid"
-RANDOM_BOXES_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/random_boxes"
-ANOMALY_MAPS_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/anomaly_maps"
-RESULTS_CSV_PATH = f"/{root_directory_path}/{current_dir}/experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/l2_distance_random_box_multiple_seeds.csv"
+DATASET_NAME = "BraTS2021_slice"
+SPLIT = "valid"
 
 # How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
+AGGREGATE_PATCHES_STRATEGY = "mean"
+GAUSSIAN_FILTER_BLUR_SIGMA = 4
+
+CONFIG_PATH = f"/{root_directory_path}/{current_dir}/configs/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3.yaml"
+CKPT_PATH = f"/{root_directory_path}/{current_dir}/experiments_{DATASET_NAME}/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/checkpoints/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3-latest.pth.tar"
+EVALUATION_DATASET_PATH = f"/{root_directory_path}/BMAD/dataset/{DATASET_NAME}/{SPLIT}"
+RANDOM_BOXES_PATH = f"/{root_directory_path}/{current_dir}/experiments_{DATASET_NAME}/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/results_{SPLIT}/random_boxes"
+
+ANOMALY_MAPS_IMAGES_PATH = f"/{root_directory_path}/{current_dir}/experiments_{DATASET_NAME}/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/results_{SPLIT}/anomaly_maps_images_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}"
+ANOMALY_MAPS_ARRAYS_PATH = f"/{root_directory_path}/{current_dir}/experiments_{DATASET_NAME}/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/results_{SPLIT}/anomaly_maps_arrays_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}"
+DISTANCES_RESULTS_CSV_PATH = f"/{root_directory_path}/{current_dir}/experiments_{DATASET_NAME}/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/results_{SPLIT}/l2_distance_random_box_{NUM_TARGET_BOXES_PER_IMAGE}_seeds.csv"
+
 # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
 SAVE_IMAGES_WITH_MASKS = True
 
-GAUSSIAN_FILTER_SIGMA = 4
 
 def main():
     # Set up the device
@@ -126,7 +134,7 @@ def main():
         ])
     
     val_dataset = SegmentationWithLabelDataset(
-        images_dir=VALIDATION_DATASET_PATH,
+        images_dir=EVALUATION_DATASET_PATH,
         transform=image_transform,
         mask_transform=mask_transform)
 
@@ -223,12 +231,12 @@ def main():
                 # Saving the input image masked using the sampled random box (only the pixels inside the random box are visible)
                 pixels_random_mask = np.repeat(np.expand_dims(dict_mask_target_encoder["pixels_random_mask"], axis=0), 3, axis=0).astype("uint8")
                 masked_image = np.transpose((255 * image_arr * pixels_random_mask).astype(np.uint8), (1, 2, 0))
-                Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_random_pixels_mask_image_{seed}.png")
+                Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_random_pixels_mask_image_seed_{seed}.png")
 
                 # Save the image with the encoder masked context
                 encoder_context_mask = np.repeat(np.expand_dims(encoder_context_mask_arr, axis=0), 3, axis=0).astype("uint8")
                 masked_image = np.transpose((255 * image_arr * encoder_context_mask).astype(np.uint8), (1, 2, 0))
-                Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_context_image_{seed}.png")
+                Image.fromarray(masked_image).convert("RGB").save(f"{RANDOM_BOXES_PATH}/{image_name}_context_image_seed_{seed}.png")
                 ### Code used only for saving the images - end
         
             encoder.eval()
@@ -287,44 +295,58 @@ def main():
         "box_size": list_box_sizes,
         "seed": list_seeds
     })
-    df.to_csv(RESULTS_CSV_PATH, index=False)
+
+    if not os.path.exists(ANOMALY_MAPS_ARRAYS_PATH):
+        os.makedirs(ANOMALY_MAPS_ARRAYS_PATH, exist_ok=True)
+    
+    if not os.path.exists(Path(DISTANCES_RESULTS_CSV_PATH).parent):
+        os.makedirs(Path(DISTANCES_RESULTS_CSV_PATH).parent, exist_ok=True)
+
+    df.to_csv(DISTANCES_RESULTS_CSV_PATH, index=False)
 
     anomaly_maps = []
     for image_name in list_image_names:
-        anomaly_map = build_anomaly_map(
+        anomaly_map = build_anomaly_map_interpolation(
             per_patch_l2_distances_dict=image_per_patch_l2_distances[image_name],
             image_height=crop_size,
             image_width=crop_size,
-            patch_size=patch_size
+            patch_size=patch_size,
+            agg_strategy=AGGREGATE_PATCHES_STRATEGY
         )
         anomaly_maps.append(anomaly_map)
+        anomaly_map = gaussian_filter(anomaly_map, GAUSSIAN_FILTER_BLUR_SIGMA)
 
     # For visualisation purposes
     # MIN-MAX scaling to convert the pixels in the [0, 1] range so that we can display the anomaly maps
     # Compute the min, max statistics at the dataset level
-    if not os.path.exists(ANOMALY_MAPS_PATH):
-        os.makedirs(ANOMALY_MAPS_PATH, exist_ok=True)
+    if not os.path.exists(ANOMALY_MAPS_IMAGES_PATH):
+        os.makedirs(ANOMALY_MAPS_IMAGES_PATH, exist_ok=True)
 
     max_patch_value = max([np.max(anomaly_map) for anomaly_map in anomaly_maps])
     min_patch_value = min([np.min(anomaly_map) for anomaly_map in anomaly_maps])
     for anomaly_map, segmentation_mask, image_name, label in zip(anomaly_maps, list_segmentation_masks, list_image_names, list_labels):
         scaled_anomaly_map =  (anomaly_map - min_patch_value) / (max_patch_value - min_patch_value + 1e-8)
-        Image.fromarray((255 * scaled_anomaly_map).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_PATH}/{image_name}_anomaly_map.png")
+        scaled_anomaly_map_path = f"{ANOMALY_MAPS_ARRAYS_PATH}/{image_name}_anomaly_map_label_{label}.npy"
+        np.save(file=scaled_anomaly_map_path, arr=scaled_anomaly_map)
+        segmentation_mask_path = scaled_anomaly_map_path.replace("_anomaly_map_", "_segmentation_mask_")
+        np.save(file=segmentation_mask_path, arr=segmentation_mask)
+
+        Image.fromarray((255 * scaled_anomaly_map).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_IMAGES_PATH}/{image_name}_anomaly_map_label_{label}.png")
         segmentation_mask = np.squeeze(np.array(segmentation_mask))
-        Image.fromarray((segmentation_mask * 255).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_PATH}/{image_name}_segmentation.png")
+        Image.fromarray((segmentation_mask * 255).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_IMAGES_PATH}/{image_name}_segmentation_label_{label}.png")
 
         scaled_anomaly_map = (scaled_anomaly_map * 255).astype(np.uint8)
         scaled_anomaly_map = cvt2heatmap(scaled_anomaly_map)
 
         label_subpath = "good" if label == 0 else "Ungood"
-        image_path = os.path.join(VALIDATION_DATASET_PATH, label_subpath, "img", image_name + ".png")
+        image_path = os.path.join(EVALUATION_DATASET_PATH, label_subpath, "img", image_name + ".png")
         initial_image = cv2.imread(image_path)
         initial_image = cv2.cvtColor(initial_image, cv2.COLOR_BGR2RGB)
         initial_image = cv2.resize(initial_image, dsize=(crop_size, crop_size), interpolation=cv2.INTER_CUBIC)
         initial_image = (initial_image * 255).astype(np.uint8)
 
         heatmap = cv2.addWeighted(scaled_anomaly_map, 0.4, initial_image, (1 - 0.4), 0)
-        cv2.imwrite(f"{ANOMALY_MAPS_PATH}/{image_name}_heatmap.png", heatmap)
+        cv2.imwrite(f"{ANOMALY_MAPS_IMAGES_PATH}/{image_name}_heatmap.png", heatmap)
 
 if __name__ == "__main__":
     main()

@@ -8,6 +8,7 @@ import statistics
 import glob
 import cv2
 import torch
+import random
 from src.masks.multiblock import MaskCollator
 
 label2idx = {"good": 0, "Ungood": 1}
@@ -72,9 +73,15 @@ def get_random_box(
     box_width *= patch_size
 
     np.random.seed(seed=seed)
-    top = np.random.randint(0, image_height - box_height)
-    left = np.random.randint(0, image_width - box_width)
-
+    random.seed(seed=seed)
+    height_sampling_locations = [
+        x for x in range(0, image_height - box_height + 1, patch_size)
+    ]
+    width_sampling_locations = [
+        x for x in range(0, image_width - box_width + 1, patch_size)
+    ]
+    top = random.sample(population=height_sampling_locations, k=1)[0]
+    left = random.sample(population=width_sampling_locations, k=1)[0]
     random_box = [(top, left), (top + box_height, left + box_width)]
 
     pixels_random_mask = np.zeros(shape=(image_height, image_width))
@@ -105,12 +112,12 @@ def transform_from_target_box_to_mask(
     end_width = box[1][1] // patch_size
 
     mask = torch.zeros((image_height, image_width), dtype=torch.int32)
-    mask[start_height:end_height, start_width:end_width] = 1
+    mask[start_height: end_height, start_width: end_width] = 1
     mask = torch.nonzero(mask.flatten())
     mask = mask.squeeze()
     
     mask_complement = torch.ones((image_height, image_width), dtype=torch.int32)
-    mask_complement[start_height:end_height, start_width:end_width] = 0
+    mask_complement[start_height: end_height, start_width: end_width] = 0
     
     return {
         "mask": mask,
@@ -155,7 +162,7 @@ def sample_context(
         input_size=(image_height, image_width),
         patch_size=patch_size
     )
-        
+    
     g = torch.Generator()
     image_height //= patch_size
     image_width //= patch_size
@@ -168,6 +175,8 @@ def sample_context(
             scale=enc_mask_scale,
             aspect_ratio_scale=aspect_ratio
         )
+        print("context_height: ", context_height)
+        print("context_width: ", context_width)
 
         np.random.seed(it)
         start_height = np.random.randint(low=0, high=image_height - context_height)
@@ -180,12 +189,14 @@ def sample_context(
         encoder_mask = torch.nonzero(encoder_mask.flatten())
         encoder_mask = encoder_mask.squeeze()
 
+        print("encoder_mask.shape before: ", encoder_mask.shape)
         # Remove from the context the patches contained in the target boxes
         for target_mask in target_masks:
-            encoder_mask = torch.tensor(list(set(encoder_mask.tolist()) - set(target_mask.tolist())))
+            # encoder_mask = torch.tensor(list(set(encoder_mask.tolist()) - set(target_mask.tolist())))
             # cleaner version
-            # encoder_mask = encoder_mask[~torch.isin(encoder_mask, target_mask)]
+            encoder_mask = encoder_mask[~torch.isin(encoder_mask, target_mask)]
 
+        print("encoder_mask.shape after: ", encoder_mask.shape)
         if encoder_mask.shape[0] >= min_keep:
             return torch.unsqueeze(encoder_mask, 0)
         else:
@@ -215,20 +226,53 @@ def build_anomaly_map(
         per_patch_l2_distances_dict: Dict[str, List[float]],
         image_height: int,
         image_width: int,
-        patch_size: int
+        patch_size: int,
+        agg_strategy: str= "mean"
     ):
     num_patches_width = image_width // patch_size
 
     anomaly_map = np.zeros((image_height, image_width))
     for patch_idx, l2_distances in per_patch_l2_distances_dict.items():
         if len(l2_distances) > 0:
-            mean_l2_distance = statistics.mean(l2_distances)
+            if agg_strategy == "mean":
+                aggregated_distance_per_patch = statistics.mean(l2_distances)
+            else:
+                aggregated_distance_per_patch = max(l2_distances)
+
             row = patch_idx // num_patches_width
             col = patch_idx % num_patches_width
+            
             anomaly_map[
                 row * patch_size: (row + 1) * patch_size,
-                col * patch_size: (col + 1) * patch_size] = mean_l2_distance
+                col * patch_size: (col + 1) * patch_size] = aggregated_distance_per_patch
     
+    return anomaly_map
+
+def build_anomaly_map_interpolation(
+        per_patch_l2_distances_dict: Dict[str, List[float]],
+        image_height: int,
+        image_width: int,
+        patch_size: int,
+        agg_strategy: str= "mean"
+    ):
+    num_patches_height = image_height // patch_size
+    num_patches_width = image_width // patch_size
+
+    patches_anomaly_map = np.zeros((num_patches_height, num_patches_width))
+    for patch_idx, l2_distances in per_patch_l2_distances_dict.items():
+        if len(l2_distances) > 0:
+            if agg_strategy == "mean":
+                aggregated_distance_per_patch = statistics.mean(l2_distances)
+            else:
+                aggregated_distance_per_patch = max(l2_distances)
+
+            row = patch_idx // num_patches_width
+            col = patch_idx % num_patches_width
+            patches_anomaly_map[row, col] = aggregated_distance_per_patch
+
+    anomaly_map = cv2.resize(
+        patches_anomaly_map, dsize=(image_height, image_width), interpolation=cv2.INTER_LINEAR)
+
     return anomaly_map
 
 
@@ -271,6 +315,9 @@ class SegmentationWithLabelDataset(Dataset):
             image = self.transform(image)
         if self.mask_transform:
             mask = self.mask_transform(mask)
+            # Preprocessing the segmentation masks: from BMAD codebase: https://github.com/DorisBao/BMAD/blob/main/UTRAD/data.py#L130
+            mask[mask >= 0.1] = 1
+            mask[mask < 0.1] = 0
 
         return image, mask, label, img_name
     
