@@ -313,7 +313,8 @@ def main():
             patch_size=patch_size,
             agg_strategy=AGGREGATE_PATCHES_STRATEGY
         )
-        anomaly_map = gaussian_filter(anomaly_map, GAUSSIAN_FILTER_BLUR_SIGMA)
+        if GAUSSIAN_FILTER_BLUR_SIGMA != -1:
+            anomaly_map = gaussian_filter(anomaly_map, GAUSSIAN_FILTER_BLUR_SIGMA)
         anomaly_maps.append(anomaly_map)
         
     # For visualisation purposes
@@ -327,7 +328,7 @@ def main():
     for anomaly_map, segmentation_mask, image_name, label in zip(anomaly_maps, list_segmentation_masks, list_image_names, list_labels):
         # Min-max scaling
         scaled_anomaly_map =  (anomaly_map - min_patch_value) / (max_patch_value - min_patch_value + 1e-8)
-        
+
         scaled_anomaly_map_path = f"{ANOMALY_MAPS_ARRAYS_PATH}/{image_name}_anomaly_map_label_{label}.npy"
         np.save(file=scaled_anomaly_map_path, arr=scaled_anomaly_map)
         segmentation_mask_path = scaled_anomaly_map_path.replace("_anomaly_map_", "_segmentation_mask_")
@@ -337,6 +338,7 @@ def main():
         segmentation_mask = np.squeeze(np.array(segmentation_mask))
         Image.fromarray((segmentation_mask * 255).astype("uint8")).convert("L").save(f"{ANOMALY_MAPS_IMAGES_PATH}/{image_name}_segmentation_label_{label}.png")
 
+        # Convert the anomaly map into a heatmap and superimpose it on the initial image
         scaled_anomaly_map = (scaled_anomaly_map * 255).astype(np.uint8)
         scaled_anomaly_map = cvt2heatmap(scaled_anomaly_map)
 
