@@ -1,7 +1,3 @@
-# NOTE: ImageNet-22K (IN22k) dataloader is not implemented
-# please implement IN22k data loader based on your data
-# storage format, and update the paths in your config
-# to load from your IN22k dataset.
 meta:
   use_bfloat16: true
   load_checkpoint_path: pretrained_checkpoints/init_checkpoints/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3.pth.tar
@@ -82,5 +78,5 @@ optimization:
 
 
 logging:
-  logging_folder: experiments/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/logs/
-  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3
+  logging_folder: experiments_BraTS2021_slice/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization/logs/
+  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization

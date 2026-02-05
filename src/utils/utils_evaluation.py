@@ -266,8 +266,8 @@ def build_anomaly_map_interpolation(
             else:
                 aggregated_distance_per_patch = max(l2_distances)
 
-            row = patch_idx // num_patches_width
-            col = patch_idx % num_patches_width
+            row = int(patch_idx) // num_patches_width
+            col = int(patch_idx) % num_patches_width
             patches_anomaly_map[row, col] = aggregated_distance_per_patch
 
     anomaly_map = cv2.resize(

@@ -9,17 +9,38 @@ subpath_list = os.getcwd().split(os.sep)
 root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
-# Read the data
+###  To modify these configuration values
 DATASET_NAME = "BraTS2021_slice"
 SPLIT = "valid"
 AGGREGATE_PATCHES_STRATEGY = "mean"
 NUM_TARGET_BOXES_PER_IMAGE = 30
 GAUSSIAN_FILTER_BLUR_SIGMA = 4
-ANOMALY_MAPS_ARRAYS_PATH = f"/{root_directory_path}/{current_dir}/experiments_{DATASET_NAME}/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3/results_{SPLIT}/anomaly_maps_arrays_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}"
-
+DISTANCE = "l2"
 
 # For computing the image-level metrics
 PER_IMAGE_STATISTIC = "mean"
+
+###
+
+EXPERIMENT_FOLDER_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization"
+
+EXPERIMENT_FOLDER_PATH = (
+    f"/{root_directory_path}/{current_dir}/"
+    f"experiments_{DATASET_NAME}/{EXPERIMENT_FOLDER_NAME}/results_{SPLIT}"
+)
+
+ANOMALY_MAPS_ARRAYS_PATH = (
+    f"{EXPERIMENT_FOLDER_PATH}/"
+    f"anomaly_maps_arrays_{DISTANCE}_distance_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_"
+    f"{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}"
+)
+
+METRICS_FOLDER = f"{EXPERIMENT_FOLDER_PATH}/Metrics/"
+
+METRICS_PATH = (
+    f"{METRICS_FOLDER}/metrics_{DISTANCE}_distance_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_"
+    f"{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}.csv"
+)
 
 anomaly_maps_paths = [
     file_path for file_path in 
@@ -68,7 +89,6 @@ plt.savefig("Image_roc_curve.png")
 # for pred, image_name, label in zip(image_scores, image_name_list, gt_label_list):
 #     print("~~~" + str(pred) + ", " + image_name + ", " + str(label))
 
-
 # Calculate per-pixel level ROCAUC
 y_masks_gt = np.concatenate(gt_segmentations_list).astype('int')
 y_amaps_pred = np.concatenate(anomaly_maps_list).astype('float32')
@@ -81,14 +101,3 @@ per_pixel_rocauc = roc_auc_score(
 )
 print('pixel ROCAUC: %.5f' % (per_pixel_rocauc))
 
-# AGGREGATE_PATCHES_STRATEGY = "mean"
-# NUM_TARGET_BOXES_PER_IMAGE = 30
-# PER_IMAGE_STATISTIC = "mean"
-# image ROCAUC: 0.90210
-# pixel ROCAUC: 0.94559
-
-# Gaussian Sigma = 4
-# Number of anomalous samples:  44
-# Total number of samples:  83
-# image ROCAUC: 0.90210
-# pixel ROCAUC: 0.94686
