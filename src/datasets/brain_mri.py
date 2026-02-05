@@ -6,15 +6,11 @@
 #
 
 import os
-
-import numpy as np
-
 from logging import getLogger
 
 import torch
 import torchvision
 
-_GLOBAL_SEED = 0
 logger = getLogger()
 
 
