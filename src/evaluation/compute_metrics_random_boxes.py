@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import glob
+import pandas as pd
 from sklearn.metrics import roc_curve, roc_auc_score, RocCurveDisplay
 import matplotlib.pyplot as plt 
 
@@ -13,13 +14,12 @@ current_dir = subpath_list[-1]
 DATASET_NAME = "BraTS2021_slice"
 SPLIT = "valid"
 AGGREGATE_PATCHES_STRATEGY = "mean"
-NUM_TARGET_BOXES_PER_IMAGE = 30
-GAUSSIAN_FILTER_BLUR_SIGMA = 4
+NUM_TARGET_BOXES_PER_IMAGE = 3
+GAUSSIAN_FILTER_BLUR_SIGMA = 10
 DISTANCE = "l2"
 
 # For computing the image-level metrics
 PER_IMAGE_STATISTIC = "mean"
-
 ###
 
 EXPERIMENT_FOLDER_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization"
@@ -35,11 +35,12 @@ ANOMALY_MAPS_ARRAYS_PATH = (
     f"{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}"
 )
 
-METRICS_FOLDER = f"{EXPERIMENT_FOLDER_PATH}/Metrics/"
+METRICS_FOLDER = f"{EXPERIMENT_FOLDER_PATH}/Metrics"
+os.makedirs(METRICS_FOLDER, exist_ok=True)
 
 METRICS_PATH = (
     f"{METRICS_FOLDER}/metrics_{DISTANCE}_distance_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_"
-    f"{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}.csv"
+    f"{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}_per_image_statistic_{PER_IMAGE_STATISTIC}.csv"
 )
 
 anomaly_maps_paths = [
@@ -101,3 +102,19 @@ per_pixel_rocauc = roc_auc_score(
 )
 print('pixel ROCAUC: %.5f' % (per_pixel_rocauc))
 
+metrics_df = pd.DataFrame(
+    {
+        "DATASET_NAME": [DATASET_NAME],
+        "SPLIT": [SPLIT],
+        "AGGREGATE_PATCHES_STRATEGY": [AGGREGATE_PATCHES_STRATEGY],
+        "NUM_TARGET_BOXES_PER_IMAGE": [NUM_TARGET_BOXES_PER_IMAGE],
+        "GAUSSIAN_FILTER_BLUR_SIGMA": [GAUSSIAN_FILTER_BLUR_SIGMA],
+        "PER_IMAGE_STATISTIC": [PER_IMAGE_STATISTIC],
+        "Image ROCAUC": [img_roc_auc],
+        "Pixel ROCAUC": [per_pixel_rocauc],
+        "DISTANCE": [DISTANCE]
+
+    }
+) 
+
+metrics_df.to_csv(METRICS_PATH, index=False)
