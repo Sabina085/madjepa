@@ -25,10 +25,10 @@ current_dir = subpath_list[-1]
 ###  To modify these configuration values
 DATASET_NAME = "BraTS2021_slice"
 EXPERIMENT_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization"
-SPLIT = "valid"
+SPLIT = "test"
 # How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
-DISTANCE = "l2"
+DISTANCE = "l1"
 # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
 SAVE_IMAGES_WITH_MASKS = False
 ###
@@ -176,13 +176,13 @@ def main():
     list_box_sizes = []
     list_image_names = []
     list_segmentation_masks = []
-    list_l2_distances_per_image = []
+    list_distances_per_image = []
     list_labels = []
     list_seeds = []
 
     # -- used for building the anomaly map
     num_patches = (crop_size // patch_size) * (crop_size // patch_size)
-    image_per_patch_l2_distances = {}
+    image_per_patch_distances = {}
     # --
     
     for box_idx in tqdm(range(NUM_TARGET_BOXES_PER_IMAGE)):
@@ -201,7 +201,7 @@ def main():
             segmentation_masks = np.squeeze(np.asarray(segmentation_masks))
 
             if box_idx == 0:
-                image_per_patch_l2_distances[image_name] = {patch_idx: [] for patch_idx in range(num_patches)}
+                image_per_patch_distances[image_name] = {patch_idx: [] for patch_idx in range(num_patches)}
 
             dict_mask_target_encoder = get_random_box(
                 image_height=crop_size,
@@ -295,10 +295,17 @@ def main():
                 predictor_emb = predictor.forward(encoder_emb, encoder_mask, list_masks_target_encoder)
 
                 # --- Compute the metrics
-                # Average L2 distance between the predicted and target patch-level representations (embeddings) for the random box
-                l2_per_embedding = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
-                l2_per_image = torch.mean(input=l2_per_embedding, dim=1, keepdim=False)
-                list_l2_distances_per_image.append(l2_per_image.item())
+                # Average distance between the predicted and target patch-level representations (embeddings) for the random box
+                if DISTANCE == "l2":
+                    distance_per_embedding = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
+                elif DISTANCE == "l1":
+                    distance_per_embedding = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=1, dim=2)
+                else:
+                    print("Distance metric is not correct! Set DISTANCE to one of the following options: l1, l2")
+                    return               
+
+                distance_per_image = torch.mean(input=distance_per_embedding, dim=1, keepdim=False)
+                list_distances_per_image.append(distance_per_image.item())
 
                 list_image_names.append(image_name)
                 list_box_sizes.append((target_block_h * patch_size, target_block_w * patch_size))
@@ -306,27 +313,34 @@ def main():
                 list_seeds.append(seed)
                 list_segmentation_masks.append(segmentation_masks)
 
-                # Get L2 distances per patch embedding for building an anomaly map
-                l2_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
+                # Get distances per patch embedding for building an anomaly map
+                if DISTANCE == "l2":
+                    distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
+                elif DISTANCE == "l1":
+                    distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=1, dim=2)
+                else:
+                    print("Distance metric is not correct! Set DISTANCE to one of the following options: l1, l2")
+                    return
+                
                 for mask in list_masks_target_encoder:
                     mask = torch.squeeze(mask)
                     indices_mask_target = mask.tolist()
                     for idx_tensor, index_patch in enumerate(indices_mask_target):
-                        image_per_patch_l2_distances[image_name][index_patch] += [l2_per_patch[0, idx_tensor].item()]
+                        image_per_patch_distances[image_name][index_patch] += [distance_per_patch[0, idx_tensor].item()]
 
         try:
             print("seed: ", seed)
-            print("Mean L2 anomaly images mean: ", statistics.mean(
-                [l2_dist for l2_dist, label in zip(list_l2_distances_per_image, list_labels) if label == 1]))
-            print("Mean L2 normal images mean: ", statistics.mean(
-                [l2_dist for l2_dist, label in zip(list_l2_distances_per_image, list_labels) if label == 0]))
+            print(f"Mean {DISTANCE} anomaly images mean: ", statistics.mean(
+                [distance for distance, label in zip(list_distances_per_image, list_labels) if label == 1]))
+            print(f"Mean {DISTANCE} normal images mean: ", statistics.mean(
+                [distance for distance, label in zip(list_distances_per_image, list_labels) if label == 0]))
         except Exception as e:
             print(f"Error when computing the mean distance per image: {e}")
 
     df = pd.DataFrame({
         "image_name": list_image_names,
         "label": list_labels,
-        "l2_distance": list_l2_distances_per_image,
+        f"{DISTANCE}_distance": list_distances_per_image,
         "box_size": list_box_sizes,
         "seed": list_seeds
     })
@@ -343,7 +357,7 @@ def main():
         
         save_dict_path = os.path.join(SAVE_PER_PATCH_RESULTS_FOLDER, image_name + "_distances_label" + "_" + str(label) + ".json")
         with open(save_dict_path, "w") as f:
-            json.dump(image_per_patch_l2_distances[image_name], f)
+            json.dump(image_per_patch_distances[image_name], f)
         
         save_segmentation_path = os.path.join(SAVE_PER_PATCH_RESULTS_FOLDER, image_name + "_segmentation_mask_label_" + str(label) + ".npy")
         np.save(file=save_segmentation_path, arr=segmentation_mask)

@@ -2,9 +2,11 @@ import os
 import numpy as np
 import glob
 import pandas as pd
+import seaborn as sns
 from sklearn.metrics import roc_curve, roc_auc_score, RocCurveDisplay
 import matplotlib.pyplot as plt 
 
+sns.set_theme()
 
 subpath_list = os.getcwd().split(os.sep)
 root_directory_path = os.path.join(*subpath_list[:-1])
@@ -12,11 +14,11 @@ current_dir = subpath_list[-1]
 
 ###  To modify these configuration values
 DATASET_NAME = "BraTS2021_slice"
-SPLIT = "valid"
+SPLIT = "test"
 AGGREGATE_PATCHES_STRATEGY = "mean"
-NUM_TARGET_BOXES_PER_IMAGE = 3
-GAUSSIAN_FILTER_BLUR_SIGMA = 10
-DISTANCE = "l2"
+NUM_TARGET_BOXES_PER_IMAGE = 30
+GAUSSIAN_FILTER_BLUR_SIGMA = 4
+DISTANCE = "l1"
 
 # For computing the image-level metrics
 PER_IMAGE_STATISTIC = "mean"
@@ -79,7 +81,9 @@ print("Number of anomalous samples: ", sum(gt_label_list))
 print("Total number of samples: ", len(gt_label_list))
 
 # Calculate image-level ROC AUC score
-fpr, tpr, _ = roc_curve(y_true=gt_label_list, y_score=image_scores)
+fprs, tprs, thresholds = roc_curve(y_true=gt_label_list, y_score=image_scores)
+for fpr, tpr, threshold in zip(fprs, tprs, thresholds):
+    print(f"threshold: {threshold} -> fpr: {fpr}, tpr: {tpr}")
 img_roc_auc = roc_auc_score(y_true=gt_label_list, y_score=image_scores)
 print('image ROCAUC: %.5f' % (img_roc_auc))
 
@@ -89,6 +93,11 @@ plt.savefig("Image_roc_curve.png")
 
 # for pred, image_name, label in zip(image_scores, image_name_list, gt_label_list):
 #     print("~~~" + str(pred) + ", " + image_name + ", " + str(label))
+
+predictions_df = pd.DataFrame({"prediction": image_scores, "label": gt_label_list})
+sns.displot(predictions_df, x="prediction", hue="label", kind="hist")
+plt.savefig("my_plot.png")
+plt.close()
 
 # Calculate per-pixel level ROCAUC
 y_masks_gt = np.concatenate(gt_segmentations_list).astype('int')

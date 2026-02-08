@@ -14,12 +14,12 @@ current_dir = subpath_list[-1]
 
 ###  To modify these configuration values
 DATASET_NAME = "BraTS2021_slice"
-SPLIT = "valid"
+SPLIT = "test"
 # How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
 AGGREGATE_PATCHES_STRATEGY = "mean"
 GAUSSIAN_FILTER_BLUR_SIGMA = 4
-DISTANCE = "l2"
+DISTANCE = "l1"
 EXPERIMENT_FOLDER_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization"
 CROP_SIZE = 224
 PATCH_SIZE = 16
@@ -71,7 +71,7 @@ def get_dataset_anomaly_map_min_max(results_dicts_file_paths):
             distance_dict = json.load(f)
         
         anomaly_map = build_anomaly_map_interpolation(
-            per_patch_l2_distances_dict=distance_dict,
+            per_patch_distances_dict=distance_dict,
             image_height=CROP_SIZE,
             image_width=CROP_SIZE,
             patch_size=PATCH_SIZE,
@@ -106,7 +106,7 @@ def main():
         segmentation_mask = np.load(file=saved_segmentation_path)
 
         anomaly_map = build_anomaly_map_interpolation(
-            per_patch_l2_distances_dict=results_distances_dict,
+            per_patch_distances_dict=results_distances_dict,
             image_height=CROP_SIZE,
             image_width=CROP_SIZE,
             patch_size=PATCH_SIZE,
@@ -130,13 +130,13 @@ def main():
         # Convert the anomaly map into a heatmap and superimpose it on the initial image
         scaled_anomaly_map = (scaled_anomaly_map * 255).astype(np.uint8)
         scaled_anomaly_map = cvt2heatmap(scaled_anomaly_map)
-        # scaled_anomaly_map = cv2.cvtColor(scaled_anomaly_map, cv2.COLOR_BGR2RGB)
+        scaled_anomaly_map = cv2.cvtColor(scaled_anomaly_map, cv2.COLOR_BGR2RGB)
 
         label_subpath = "good" if label == 0 else "Ungood"
         image_path = os.path.join(EVALUATION_DATASET_PATH, label_subpath, "img", image_name + ".png")
         initial_image = cv2.imread(image_path)
         cv2.imwrite(f"{ANOMALY_MAPS_IMAGES_PATH}/{image_name}_original.png", initial_image)
-        # initial_image = cv2.cvtColor(initial_image, cv2.COLOR_BGR2RGB)
+        initial_image = cv2.cvtColor(initial_image, cv2.COLOR_BGR2RGB)
         initial_image = cv2.resize(initial_image, dsize=(CROP_SIZE, CROP_SIZE), interpolation=cv2.INTER_CUBIC)
         initial_image = (initial_image * 255).astype(np.uint8)
 

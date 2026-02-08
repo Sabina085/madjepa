@@ -223,7 +223,7 @@ def zscore_sigmoid(anomaly_map, eps=1e-8):
     return 1.0 / (1.0 + np.exp(-z))
 
 def build_anomaly_map(
-        per_patch_l2_distances_dict: Dict[str, List[float]],
+        per_patch_distances_dict: Dict[str, List[float]],
         image_height: int,
         image_width: int,
         patch_size: int,
@@ -232,12 +232,12 @@ def build_anomaly_map(
     num_patches_width = image_width // patch_size
 
     anomaly_map = np.zeros((image_height, image_width))
-    for patch_idx, l2_distances in per_patch_l2_distances_dict.items():
-        if len(l2_distances) > 0:
+    for patch_idx, distances in per_patch_distances_dict.items():
+        if len(distances) > 0:
             if agg_strategy == "mean":
-                aggregated_distance_per_patch = statistics.mean(l2_distances)
+                aggregated_distance_per_patch = statistics.mean(distances)
             else:
-                aggregated_distance_per_patch = max(l2_distances)
+                aggregated_distance_per_patch = max(distances)
 
             row = patch_idx // num_patches_width
             col = patch_idx % num_patches_width
@@ -249,7 +249,7 @@ def build_anomaly_map(
     return anomaly_map
 
 def build_anomaly_map_interpolation(
-        per_patch_l2_distances_dict: Dict[str, List[float]],
+        per_patch_distances_dict: Dict[str, List[float]],
         image_height: int,
         image_width: int,
         patch_size: int,
@@ -259,12 +259,12 @@ def build_anomaly_map_interpolation(
     num_patches_width = image_width // patch_size
 
     patches_anomaly_map = np.zeros((num_patches_height, num_patches_width))
-    for patch_idx, l2_distances in per_patch_l2_distances_dict.items():
-        if len(l2_distances) > 0:
+    for patch_idx, distances in per_patch_distances_dict.items():
+        if len(distances) > 0:
             if agg_strategy == "mean":
-                aggregated_distance_per_patch = statistics.mean(l2_distances)
+                aggregated_distance_per_patch = statistics.mean(distances)
             else:
-                aggregated_distance_per_patch = max(l2_distances)
+                aggregated_distance_per_patch = max(distances)
 
             row = int(patch_idx) // num_patches_width
             col = int(patch_idx) % num_patches_width
