@@ -23,6 +23,7 @@ import sys
 import yaml
 
 import numpy as np
+from pathlib import Path
 
 import torch
 import torch.multiprocessing as mp
@@ -41,30 +42,38 @@ from src.utils.logging import (
     grad_logger,
     AverageMeter)
 from src.utils.tensors import repeat_interleave_batch
-from src.datasets.imagenet1k import make_imagenet1k
+from src.datasets.brain_mri import make_brain_mri
 
 from src.helper import (
-    load_checkpoint,
+    load_models_from_checkpoint,
     init_model,
-    init_opt)
+    init_opt,
+    init_model_dinov3
+)
 from src.transforms import make_transforms
 
 # --
 log_timings = True
 log_freq = 10
-checkpoint_freq = 50
+checkpoint_freq = 5
 # --
 
-_GLOBAL_SEED = 0
+_GLOBAL_SEED = 42
 np.random.seed(_GLOBAL_SEED)
 torch.manual_seed(_GLOBAL_SEED)
-torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.benchmark = True # maybe set this to False (default)
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger()
 
 
-def main(args, resume_preempt=False):
+def main(args):
+    # Setting the device
+    if not torch.cuda.is_available():
+        device = torch.device('cpu')
+    else:
+        device = torch.device('cuda:0')
+        torch.cuda.set_device(device)
 
     # ----------------------------------------------------------------------- #
     #  PASSED IN PARAMS FROM CONFIG FILE
@@ -72,60 +81,78 @@ def main(args, resume_preempt=False):
 
     # -- META
     use_bfloat16 = args['meta']['use_bfloat16']
-    model_name = args['meta']['model_name']
-    load_model = args['meta']['load_checkpoint'] or resume_preempt
-    r_file = args['meta']['read_checkpoint']
-    copy_data = args['meta']['copy_data']
-    pred_depth = args['meta']['pred_depth']
-    pred_emb_dim = args['meta']['pred_emb_dim']
-    if not torch.cuda.is_available():
-        device = torch.device('cpu')
-    else:
-        device = torch.device('cuda:0')
-        torch.cuda.set_device(device)
+    load_checkpoint_path = args['meta']['load_checkpoint_path']
+    checkpoint_type = args['meta']['checkpoint_type']
+    assert checkpoint_type in ['dinov3', 'ijepa'], "Checkpoint type should be: 'dinov3' or 'ijepa'"
+
+    # context encoder
+    encoder_model_name = args['meta']['encoder_model_name']
+    encoder_weights_source = args['meta']['encoder_weights_source']
+    encoder_embed_dim = args['meta']['encoder_embed_dim']
+
+    # predictor
+    predictor_model_name = args['meta']['predictor_model_name']
+    predictor_weights_source = args['meta']['predictor_weights_source']
+    predictor_depth = args['meta']['predictor_depth']
+    predictor_embed_dim = args['meta']['predictor_embed_dim']
+    predictor_num_heads = args['meta']['predictor_num_heads']
+
+    # target encoder
+    target_encoder_model_name = args['meta']['target_encoder_model_name']
+    target_encoder_weights_source = args['meta']['target_encoder_weights_source']
+
 
     # -- DATA
-    use_gaussian_blur = args['data']['use_gaussian_blur']
-    use_horizontal_flip = args['data']['use_horizontal_flip']
-    use_color_distortion = args['data']['use_color_distortion']
-    color_jitter = args['data']['color_jitter_strength']
-    # --
+    # training specifics
     batch_size = args['data']['batch_size']
-    pin_mem = args['data']['pin_mem']
-    num_workers = args['data']['num_workers']
-    root_path = args['data']['root_path']
-    image_folder = args['data']['image_folder']
     crop_size = args['data']['crop_size']
     crop_scale = args['data']['crop_scale']
-    # --
+
+    image_folder = args['data']['image_folder']
+    data_root_folder_path = args['data']['data_root_folder_path']
+    pin_mem = args['data']['pin_mem']
+    num_workers = args['data']['num_workers']
+
+    # data augmentation / transformations
+    color_jitter_strength = args['data']['color_jitter_strength']
+    use_color_distortion = args['data']['use_color_distortion']
+    use_gaussian_blur = args['data']['use_gaussian_blur']
+    use_horizontal_flip = args['data']['use_horizontal_flip']
+    
 
     # -- MASK
-    allow_overlap = args['mask']['allow_overlap']  # whether to allow overlap b/w context and target blocks
     patch_size = args['mask']['patch_size']  # patch-size for model training
-    num_enc_masks = args['mask']['num_enc_masks']  # number of context blocks
-    min_keep = args['mask']['min_keep']  # min number of patches in context block
+    allow_overlap = args['mask']['allow_overlap']  # whether to allow overlap b/w context and target blocks
+    
     enc_mask_scale = args['mask']['enc_mask_scale']  # scale of context blocks
-    num_pred_masks = args['mask']['num_pred_masks']  # number of target blocks
+    enc_mask_aspect_ratio = args['mask']['enc_mask_aspect_ratio'] # aspect ratio of the context blocks
+    enc_min_keep = args['mask']['enc_min_keep']  # min number of patches in context block
+    num_enc_masks = args['mask']['num_enc_masks']  # number of context blocks
+    
     pred_mask_scale = args['mask']['pred_mask_scale']  # scale of target blocks
-    aspect_ratio = args['mask']['aspect_ratio']  # aspect ratio of target blocks
-    # --
+    pred_mask_aspect_ratio = args['mask']['pred_mask_aspect_ratio']  # aspect ratio of target blocks
+    num_pred_masks = args['mask']['num_pred_masks']  # number of target blocks
+    
 
     # -- OPTIMIZATION
+    num_epochs = args['optimization']['num_epochs']
     ema = args['optimization']['ema']
     ipe_scale = args['optimization']['ipe_scale']  # scheduler scale factor (def: 1.0)
+
+    lr = args['optimization']['lr']
+    start_lr = args['optimization']['start_lr']
+    final_lr = args['optimization']['final_lr']
+    warmup = args['optimization']['warmup']
+
     wd = float(args['optimization']['weight_decay'])
     final_wd = float(args['optimization']['final_weight_decay'])
-    num_epochs = args['optimization']['epochs']
-    warmup = args['optimization']['warmup']
-    start_lr = args['optimization']['start_lr']
-    lr = args['optimization']['lr']
-    final_lr = args['optimization']['final_lr']
-
+    
+    
     # -- LOGGING
-    folder = args['logging']['folder']
+    logging_folder = args['logging']['logging_folder']
     tag = args['logging']['write_tag']
 
-    dump = os.path.join(folder, 'params-ijepa.yaml')
+    dump = os.path.join(logging_folder, 'config_run.yaml')
     with open(dump, 'w') as f:
         yaml.dump(args, f)
     # ----------------------------------------------------------------------- #
@@ -142,12 +169,14 @@ def main(args, resume_preempt=False):
         logger.setLevel(logging.ERROR)
 
     # -- log/checkpointing paths
-    log_file = os.path.join(folder, f'{tag}_r{rank}.csv')
-    save_path = os.path.join(folder, f'{tag}' + '-ep{epoch}.pth.tar')
-    latest_path = os.path.join(folder, f'{tag}-latest.pth.tar')
-    load_path = None
-    if load_model:
-        load_path = os.path.join(folder, r_file) if r_file is not None else latest_path
+    log_file = os.path.join(logging_folder, f'{tag}_r{rank}.csv')
+    checkpoint_folder = logging_folder.replace("logs", "checkpoints")
+    save_path = os.path.join(checkpoint_folder, f'{tag}' + '-epoch{epoch}.pth.tar')
+    latest_path = os.path.join(checkpoint_folder, f'{tag}-latest.pth.tar')
+    if load_checkpoint_path:
+        load_path = Path(load_checkpoint_path)
+    else:
+        load_path = None
 
     # -- make csv_logger
     csv_logger = CSVLogger(log_file,
@@ -159,14 +188,32 @@ def main(args, resume_preempt=False):
                            ('%d', 'time (ms)'))
 
     # -- init model
-    encoder, predictor = init_model(
-        device=device,
-        patch_size=patch_size,
-        crop_size=crop_size,
-        pred_depth=pred_depth,
-        pred_emb_dim=pred_emb_dim,
-        model_name=model_name)
-    target_encoder = copy.deepcopy(encoder)
+    if checkpoint_type == "dinov3":
+        dict_init_models = init_model_dinov3(
+            device=device,
+            encoder_model_name=encoder_model_name,
+            encoder_weights_path=encoder_weights_source,
+            predictor_depth=predictor_depth,
+            encoder_embed_dim=encoder_embed_dim,
+            predictor_embed_dim=predictor_embed_dim,
+            predictor_num_patches=(crop_size // patch_size) * (crop_size // patch_size),
+            predictor_num_heads=predictor_num_heads,
+            target_encoder_model_name = target_encoder_model_name,
+            target_encoder_weights_path = target_encoder_weights_source
+        )
+        encoder = dict_init_models["encoder"]
+        predictor = dict_init_models["predictor"]
+        target_encoder = dict_init_models["target_encoder"]
+
+    elif checkpoint_type == "ijepa":
+        encoder, predictor = init_model(
+            device=device,
+            patch_size=patch_size,
+            crop_size=crop_size,
+            pred_depth=predictor_depth,
+            pred_emb_dim=predictor_embed_dim,
+            model_name=encoder_model_name)
+        target_encoder = copy.deepcopy(encoder)
 
     # -- make data transforms
     mask_collator = MBMaskCollator(
@@ -174,11 +221,11 @@ def main(args, resume_preempt=False):
         patch_size=patch_size,
         pred_mask_scale=pred_mask_scale,
         enc_mask_scale=enc_mask_scale,
-        aspect_ratio=aspect_ratio,
+        aspect_ratio=pred_mask_aspect_ratio,
         nenc=num_enc_masks,
         npred=num_pred_masks,
         allow_overlap=allow_overlap,
-        min_keep=min_keep)
+        min_keep=enc_min_keep)
 
     transform = make_transforms(
         crop_size=crop_size,
@@ -186,23 +233,23 @@ def main(args, resume_preempt=False):
         gaussian_blur=use_gaussian_blur,
         horizontal_flip=use_horizontal_flip,
         color_distortion=use_color_distortion,
-        color_jitter=color_jitter)
+        color_jitter=color_jitter_strength)
 
     # -- init data-loaders/samplers
-    _, unsupervised_loader, unsupervised_sampler = make_imagenet1k(
+    _, unsupervised_loader, unsupervised_sampler = make_brain_mri(
             transform=transform,
             batch_size=batch_size,
             collator=mask_collator,
             pin_mem=pin_mem,
-            training=True,
             num_workers=num_workers,
             world_size=world_size,
             rank=rank,
-            root_path=root_path,
+            root_path=data_root_folder_path,
             image_folder=image_folder,
-            copy_data=copy_data,
-            drop_last=True)
+            drop_last=True
+    )
     ipe = len(unsupervised_loader)
+    print("Number of instances per epoch = ", ipe)
 
     # -- init optimizer and scheduler
     optimizer, scaler, scheduler, wd_scheduler = init_opt(
@@ -218,32 +265,42 @@ def main(args, resume_preempt=False):
         num_epochs=num_epochs,
         ipe_scale=ipe_scale,
         use_bfloat16=use_bfloat16)
+
+    # -- momentum schedule
+    momentum_scheduler = (ema[0] + i * (ema[1] - ema[0]) / (ipe * num_epochs * ipe_scale)
+                          for i in range(int(ipe * num_epochs * ipe_scale) + 1))
+
+    start_epoch = 0
+
+    # -- load training checkpoint
+    if load_path:
+        loaded_dict_from_checkpoint = load_models_from_checkpoint(
+            checkpoint_path=load_path,
+            encoder=encoder,
+            predictor=predictor,
+            target_encoder=target_encoder,
+            optimizer=optimizer,
+            scaler=scaler,
+            dinov3_ckpt=(checkpoint_type == "dinov3")
+        )
+        encoder = loaded_dict_from_checkpoint["encoder"]
+        predictor = loaded_dict_from_checkpoint["predictor"]
+        target_encoder = loaded_dict_from_checkpoint["target_encoder"]
+        optimizer = loaded_dict_from_checkpoint["optimizer"]
+        scaler = loaded_dict_from_checkpoint["scaler"]
+        start_epoch = loaded_dict_from_checkpoint["epoch"] + 1
+
+        for _ in range(start_epoch * ipe):
+            scheduler.step()
+            wd_scheduler.step()
+            next(momentum_scheduler)
+            mask_collator.step()
+
     encoder = DistributedDataParallel(encoder, static_graph=True)
     predictor = DistributedDataParallel(predictor, static_graph=True)
     target_encoder = DistributedDataParallel(target_encoder)
     for p in target_encoder.parameters():
         p.requires_grad = False
-
-    # -- momentum schedule
-    momentum_scheduler = (ema[0] + i*(ema[1]-ema[0])/(ipe*num_epochs*ipe_scale)
-                          for i in range(int(ipe*num_epochs*ipe_scale)+1))
-
-    start_epoch = 0
-    # -- load training checkpoint
-    if load_model:
-        encoder, predictor, target_encoder, optimizer, scaler, start_epoch = load_checkpoint(
-            device=device,
-            r_path=load_path,
-            encoder=encoder,
-            predictor=predictor,
-            target_encoder=target_encoder,
-            opt=optimizer,
-            scaler=scaler)
-        for _ in range(start_epoch*ipe):
-            scheduler.step()
-            wd_scheduler.step()
-            next(momentum_scheduler)
-            mask_collator.step()
 
     def save_checkpoint(epoch):
         save_dict = {
@@ -258,12 +315,21 @@ def main(args, resume_preempt=False):
             'world_size': world_size,
             'lr': lr
         }
+        if checkpoint_type == "dinov3":
+            save_dict["encoder_model_name"] = encoder_model_name
+            save_dict["predictor_model_name"] = predictor_model_name
+            save_dict["target_encoder_model_name"] = target_encoder_model_name
+            save_dict["encoder_weights_source"] = encoder_weights_source
+            save_dict["predictor_weights_source"] = predictor_weights_source
+            save_dict["target_encoder_weights_source"] = target_encoder_weights_source
+
         if rank == 0:
             torch.save(save_dict, latest_path)
-            if (epoch + 1) % checkpoint_freq == 0:
-                torch.save(save_dict, save_path.format(epoch=f'{epoch + 1}'))
+            if epoch % checkpoint_freq == 0:
+                torch.save(save_dict, save_path.format(epoch=f'{epoch}'))
 
     # -- TRAINING LOOP
+    print(f"Started training for {num_epochs} epochs...")
     for epoch in range(start_epoch, num_epochs):
         logger.info('Epoch %d' % (epoch + 1))
 
@@ -276,7 +342,6 @@ def main(args, resume_preempt=False):
         time_meter = AverageMeter()
 
         for itr, (udata, masks_enc, masks_pred) in enumerate(unsupervised_loader):
-
             def load_imgs():
                 # -- unsupervised imgs
                 imgs = udata[0].to(device, non_blocking=True)
@@ -290,12 +355,12 @@ def main(args, resume_preempt=False):
             def train_step():
                 _new_lr = scheduler.step()
                 _new_wd = wd_scheduler.step()
-                # --
 
                 def forward_target():
                     with torch.no_grad():
-                        h = target_encoder(imgs)
-                        h = F.layer_norm(h, (h.size(-1),))  # normalize over feature-dim
+                        h = target_encoder.forward(imgs)
+                        # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
+                        # h = F.layer_norm(h, (h.size(-1),))  # normalize over feature-dim
                         B = len(h)
                         # -- create targets (masked regions of h)
                         h = apply_masks(h, masks_pred)
@@ -303,8 +368,8 @@ def main(args, resume_preempt=False):
                         return h
 
                 def forward_context():
-                    z = encoder(imgs, masks_enc)
-                    z = predictor(z, masks_enc, masks_pred)
+                    z = encoder.forward(imgs, masks_enc)
+                    z = predictor.forward(z, masks_enc, masks_pred)
                     return z
 
                 def loss_fn(z, h):
@@ -326,6 +391,7 @@ def main(args, resume_preempt=False):
                 else:
                     loss.backward()
                     optimizer.step()
+
                 grad_stats = grad_logger(encoder.named_parameters())
                 optimizer.zero_grad()
 
@@ -336,6 +402,7 @@ def main(args, resume_preempt=False):
                         param_k.data.mul_(m).add_((1.-m) * param_q.detach().data)
 
                 return (float(loss), _new_lr, _new_wd, grad_stats)
+
             (loss, _new_lr, _new_wd, grad_stats), etime = gpu_timer(train_step)
             loss_meter.update(loss)
             time_meter.update(etime)
@@ -369,10 +436,14 @@ def main(args, resume_preempt=False):
             log_stats()
 
             assert not np.isnan(loss), 'loss is nan'
+            torch.cuda.empty_cache()
 
         # -- Save Checkpoint after every epoch
         logger.info('avg. loss %.3f' % loss_meter.avg)
-        save_checkpoint(epoch+1)
+        save_checkpoint(epoch + 1)
+
+    if torch.distributed.is_initialized():
+        torch.distributed.destroy_process_group()
 
 
 if __name__ == "__main__":

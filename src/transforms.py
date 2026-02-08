@@ -12,7 +12,6 @@ from PIL import ImageFilter
 import torch
 import torchvision.transforms as transforms
 
-_GLOBAL_SEED = 0
 logger = getLogger()
 
 
@@ -23,6 +22,11 @@ def make_transforms(
     horizontal_flip=False,
     color_distortion=False,
     gaussian_blur=False,
+    # BrainMRI normalization statistics
+    # normalization=((0.1129, 0.1240, 0.1445),
+    #                (0.0392, 0.0495, 0.0612))
+    
+    # ImageNet normalization statistics - need to check if they lead to better results
     normalization=((0.485, 0.456, 0.406),
                    (0.229, 0.224, 0.225))
 ):
@@ -47,7 +51,7 @@ def make_transforms(
     if gaussian_blur:
         transform_list += [GaussianBlur(p=0.5)]
     transform_list += [transforms.ToTensor()]
-    transform_list += [transforms.Normalize(normalization[0], normalization[1])]
+    transform_list += [transforms.Normalize(mean=normalization[0], std=normalization[1])]
 
     transform = transforms.Compose(transform_list)
     return transform
@@ -65,3 +69,4 @@ class GaussianBlur(object):
 
         radius = self.radius_min + torch.rand(1) * (self.radius_max - self.radius_min)
         return img.filter(ImageFilter.GaussianBlur(radius=radius))
+    
