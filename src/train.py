@@ -43,6 +43,7 @@ from src.utils.logging import (
     AverageMeter)
 from src.utils.tensors import repeat_interleave_batch
 from src.datasets.brain_mri import make_brain_mri
+from src.datasets.liver_ct import make_liver_ct
 
 from src.helper import (
     load_models_from_checkpoint,
@@ -236,18 +237,35 @@ def main(args):
         color_jitter=color_jitter_strength)
 
     # -- init data-loaders/samplers
-    _, unsupervised_loader, unsupervised_sampler = make_brain_mri(
-            transform=transform,
-            batch_size=batch_size,
-            collator=mask_collator,
-            pin_mem=pin_mem,
-            num_workers=num_workers,
-            world_size=world_size,
-            rank=rank,
-            root_path=data_root_folder_path,
-            image_folder=image_folder,
-            drop_last=True
-    )
+    if "BraTS2021_slice" in image_folder:
+        # Brain MRI dataset
+        _, unsupervised_loader, unsupervised_sampler = make_brain_mri(
+                transform=transform,
+                batch_size=batch_size,
+                collator=mask_collator,
+                pin_mem=pin_mem,
+                num_workers=num_workers,
+                world_size=world_size,
+                rank=rank,
+                root_path=data_root_folder_path,
+                image_folder=image_folder,
+                drop_last=True
+        )
+    elif "hist_DIY" in image_folder:
+        # Liver CT dataset
+        _, unsupervised_loader, unsupervised_sampler = make_liver_ct(
+                transform=transform,
+                batch_size=batch_size,
+                collator=mask_collator,
+                pin_mem=pin_mem,
+                num_workers=num_workers,
+                world_size=world_size,
+                rank=rank,
+                root_path=data_root_folder_path,
+                image_folder=image_folder,
+                drop_last=True
+        )       
+
     ipe = len(unsupervised_loader)
     print("Number of instances per epoch = ", ipe)
 

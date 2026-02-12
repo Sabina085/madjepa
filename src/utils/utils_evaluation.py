@@ -11,8 +11,8 @@ import torch
 import random
 from src.masks.multiblock import MaskCollator
 
-label2idx = {"good": 0, "Ungood": 1}
-idx2label = {0: "good", 1: "Ungood"}
+label2idx = {"good": 0, "ungood": 1}
+idx2label = {0: "good", 1: "ungood"}
 
 
 def get_custom_target_anomaly_and_normal_box(
@@ -291,7 +291,7 @@ class SegmentationWithLabelDataset(Dataset):
         self.masks = [img_path.replace("img", "label") for img_path in self.images]
             
         # labels     
-        self.labels_names = [img_path.split("/")[8] for img_path in self.images]
+        self.labels_names = [img_path.split("/")[-3] for img_path in self.images]
         self.labels = [label2idx[label_name] for label_name in self.labels_names]
 
     def __len__(self):
@@ -334,7 +334,7 @@ class LabelDataset(Dataset):
         self.image_names = [img_path.split("/")[-1] for img_path in self.images]
             
         # labels     
-        self.labels_names = [img_path.split("/")[8] for img_path in self.images]
+        self.labels_names = [img_path.split("/")[-3] for img_path in self.images]
         self.labels = [label2idx[label_name] for label_name in self.labels_names]
 
     def __len__(self):
