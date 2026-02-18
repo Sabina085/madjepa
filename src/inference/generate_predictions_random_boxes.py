@@ -23,24 +23,24 @@ root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
 ###  To modify these configuration values
-DATASET_NAME = "BraTS2021_slice"
-EXPERIMENT_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization"
-SPLIT = "test"
+DATASET_NAME = "hist_DIY"
+EXPERIMENT_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization_batch_size_128"
+CONFIG_NAME = "hist_DIY_enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization.yaml"
+SPLIT = "valid"
 # How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
-DISTANCE = "l1"
+DISTANCE = "l2"
 # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
 SAVE_IMAGES_WITH_MASKS = False
 ###
 
-EVALUATION_DATASET_PATH = f"/{root_directory_path}/BMAD/dataset/{DATASET_NAME}/{SPLIT}"
+EVALUATION_DATASET_PATH = f"/media/vhondru/hdd/istoian/BMAD/dataset/{DATASET_NAME}/{SPLIT}"
 
 EXPERIMENT_FOLDER_PATH = (
     f"/{root_directory_path}/{current_dir}/"
     f"experiments_{DATASET_NAME}/{EXPERIMENT_NAME}/results_{SPLIT}"
 )
 
-CONFIG_NAME = "_".join([DATASET_NAME, EXPERIMENT_NAME + ".yaml"])
 CONFIG_PATH = f"/{root_directory_path}/{current_dir}/configs/{CONFIG_NAME}"
 
 CKPT_FOLDER_PATH = EXPERIMENT_FOLDER_PATH.replace(f"results_{SPLIT}", "checkpoints")

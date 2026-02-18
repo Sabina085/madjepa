@@ -13,18 +13,19 @@ root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
 ###  To modify these configuration values
-DATASET_NAME = "BraTS2021_slice"
-SPLIT = "test"
-AGGREGATE_PATCHES_STRATEGY = "mean"
+DATASET_NAME = "hist_DIY"
+SPLIT = "valid"
+AGGREGATE_PATCHES_STRATEGY = "max"
 NUM_TARGET_BOXES_PER_IMAGE = 30
 GAUSSIAN_FILTER_BLUR_SIGMA = 4
-DISTANCE = "l1"
+DISTANCE = "l2"
+# COUNT_ANOMALY_PIXELS_IN_CONTEXT = 10
 
 # For computing the image-level metrics
 PER_IMAGE_STATISTIC = "mean"
 ###
 
-EXPERIMENT_FOLDER_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization"
+EXPERIMENT_FOLDER_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization_ema_0.998"
 
 EXPERIMENT_FOLDER_PATH = (
     f"/{root_directory_path}/{current_dir}/"
@@ -35,6 +36,7 @@ ANOMALY_MAPS_ARRAYS_PATH = (
     f"{EXPERIMENT_FOLDER_PATH}/"
     f"anomaly_maps_arrays_{DISTANCE}_distance_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_"
     f"{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}"
+    # f"anomaly_pixels_in_context_{COUNT_ANOMALY_PIXELS_IN_CONTEXT}"
 )
 
 METRICS_FOLDER = f"{EXPERIMENT_FOLDER_PATH}/Metrics"
@@ -43,6 +45,7 @@ os.makedirs(METRICS_FOLDER, exist_ok=True)
 METRICS_PATH = (
     f"{METRICS_FOLDER}/metrics_{DISTANCE}_distance_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_"
     f"{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}_per_image_statistic_{PER_IMAGE_STATISTIC}.csv"
+    # f"anomaly_pixels_in_context_{COUNT_ANOMALY_PIXELS_IN_CONTEXT}.csv"
 )
 
 anomaly_maps_paths = [
@@ -121,8 +124,9 @@ metrics_df = pd.DataFrame(
         "PER_IMAGE_STATISTIC": [PER_IMAGE_STATISTIC],
         "Image ROCAUC": [img_roc_auc],
         "Pixel ROCAUC": [per_pixel_rocauc],
-        "DISTANCE": [DISTANCE]
-
+        "DISTANCE": [DISTANCE],
+        "EXPERIMENT_NAME": [EXPERIMENT_FOLDER_NAME],
+        # "COUNT_ANOMALY_PIXELS": [COUNT_ANOMALY_PIXELS_IN_CONTEXT]
     }
 ) 
 

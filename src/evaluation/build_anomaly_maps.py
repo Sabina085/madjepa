@@ -13,19 +13,20 @@ root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
 ###  To modify these configuration values
-DATASET_NAME = "BraTS2021_slice"
-SPLIT = "test"
+DATASET_NAME = "hist_DIY"
+SPLIT = "valid"
 # How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
 AGGREGATE_PATCHES_STRATEGY = "mean"
 GAUSSIAN_FILTER_BLUR_SIGMA = 4
-DISTANCE = "l1"
-EXPERIMENT_FOLDER_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization"
+DISTANCE = "l2"
+# COUNT_ANOMALY_PIXELS_IN_CONTEXT = 10
+EXPERIMENT_FOLDER_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization_batch_size_128"
 CROP_SIZE = 224
 PATCH_SIZE = 16
 ###
 
-EVALUATION_DATASET_PATH = f"/{root_directory_path}/BMAD/dataset/{DATASET_NAME}/{SPLIT}"
+EVALUATION_DATASET_PATH = f"/media/vhondru/hdd/istoian/BMAD/dataset/{DATASET_NAME}/{SPLIT}"
 
 EXPERIMENT_FOLDER_PATH = (
     f"/{root_directory_path}/{current_dir}/"
@@ -36,22 +37,20 @@ ANOMALY_MAPS_ARRAYS_PATH = (
     f"{EXPERIMENT_FOLDER_PATH}/"
     f"anomaly_maps_arrays_{DISTANCE}_distance_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_"
     f"{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}"
+    # f"anomaly_pixels_in_context_{COUNT_ANOMALY_PIXELS_IN_CONTEXT}"
 )
 
 ANOMALY_MAPS_IMAGES_PATH = (
     f"{EXPERIMENT_FOLDER_PATH}/"
     f"anomaly_maps_images_{DISTANCE}_distance_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_"
     f"{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}"
-)
-
-DISTANCES_RESULTS_CSV_PATH = (
-    f"{EXPERIMENT_FOLDER_PATH}/"
-    f"{DISTANCE}_distance_random_box_{NUM_TARGET_BOXES_PER_IMAGE}_seeds.csv"
+    # f"anomaly_pixels_in_context_{COUNT_ANOMALY_PIXELS_IN_CONTEXT}"
 )
 
 SAVED_DICTS_FOLDER = (
     f"{EXPERIMENT_FOLDER_PATH}/"
     f"image_per_patch_{DISTANCE}_distances_{NUM_TARGET_BOXES_PER_IMAGE}_seeds"
+    # f"anomaly_pixels_in_context_{COUNT_ANOMALY_PIXELS_IN_CONTEXT}"
 )
 
 if not os.path.exists(ANOMALY_MAPS_IMAGES_PATH):
@@ -95,7 +94,8 @@ def main():
     dataset_min = dataset_statistics["dataset_min"]
     dataset_max = dataset_statistics["dataset_max"]
         
-    for results_dicts_file_path in results_dicts_file_paths:
+    print("Building the anomaly maps...")
+    for results_dicts_file_path in tqdm(results_dicts_file_paths):
         image_name = "_".join(Path(results_dicts_file_path).stem.split("_")[0:2])
         label = int(results_dicts_file_path[-6])
         saved_segmentation_path = results_dicts_file_path.replace("_distances_label_", "_segmentation_mask_label_").replace(".json", ".npy")
@@ -130,13 +130,13 @@ def main():
         # Convert the anomaly map into a heatmap and superimpose it on the initial image
         scaled_anomaly_map = (scaled_anomaly_map * 255).astype(np.uint8)
         scaled_anomaly_map = cvt2heatmap(scaled_anomaly_map)
-        scaled_anomaly_map = cv2.cvtColor(scaled_anomaly_map, cv2.COLOR_BGR2RGB)
+        # scaled_anomaly_map = cv2.cvtColor(scaled_anomaly_map, cv2.COLOR_BGR2RGB)
 
-        label_subpath = "good" if label == 0 else "Ungood"
+        label_subpath = "good" if label == 0 else "ungood"
         image_path = os.path.join(EVALUATION_DATASET_PATH, label_subpath, "img", image_name + ".png")
         initial_image = cv2.imread(image_path)
         cv2.imwrite(f"{ANOMALY_MAPS_IMAGES_PATH}/{image_name}_original.png", initial_image)
-        initial_image = cv2.cvtColor(initial_image, cv2.COLOR_BGR2RGB)
+        # initial_image = cv2.cvtColor(initial_image, cv2.COLOR_BGR2RGB)
         initial_image = cv2.resize(initial_image, dsize=(CROP_SIZE, CROP_SIZE), interpolation=cv2.INTER_CUBIC)
         initial_image = (initial_image * 255).astype(np.uint8)
 
