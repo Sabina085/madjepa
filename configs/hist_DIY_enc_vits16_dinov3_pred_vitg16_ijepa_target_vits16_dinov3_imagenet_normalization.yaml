@@ -29,12 +29,6 @@ data:
   pin_mem: True
   num_workers: 10
 
-  # data augmentation / transformations
-  color_jitter_strength: 0.0
-  use_color_distortion: false
-  use_gaussian_blur: false
-  use_horizontal_flip: false
-
 
 mask:
   patch_size: 16
@@ -60,23 +54,22 @@ mask:
   - 1.5
   num_pred_masks: 4
 
-
 optimization:
-  num_epochs: 50
+  num_epochs: 20
   ema:
-  - 0.998
+  - 0.996
   - 1.0
   ipe_scale: 1.0
 
-  lr: 0.0001
-  start_lr: 0.00005
+  lr: 0.001
+  start_lr: 0.0002
   final_lr: 1.0e-06
-  warmup: 5
+  warmup: 3
 
   weight_decay: 0.04
-  final_weight_decay: 0.04
+  final_weight_decay: 0.4
 
 
 logging:
-  logging_folder: experiments_hist_DIY/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization_ema_0.998/logs/
-  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization_ema_0.998
+  logging_folder: experiments_hist_DIY/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropping/logs/
+  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropping

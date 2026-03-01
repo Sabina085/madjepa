@@ -221,6 +221,7 @@ __marimo__/
 # Folder with experiments and checkpoints
 experiments*/
 pretrained_checkpoints/
+Test_cropped_images/
 
 # Venv
 .ijepa-venv/

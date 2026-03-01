@@ -44,6 +44,7 @@ from src.utils.logging import (
 from src.utils.tensors import repeat_interleave_batch
 from src.datasets.brain_mri import make_brain_mri
 from src.datasets.liver_ct import make_liver_ct
+from src.datasets.resc import make_resc
 
 from src.helper import (
     load_models_from_checkpoint,
@@ -114,12 +115,6 @@ def main(args):
     pin_mem = args['data']['pin_mem']
     num_workers = args['data']['num_workers']
 
-    # data augmentation / transformations
-    color_jitter_strength = args['data']['color_jitter_strength']
-    use_color_distortion = args['data']['use_color_distortion']
-    use_gaussian_blur = args['data']['use_gaussian_blur']
-    use_horizontal_flip = args['data']['use_horizontal_flip']
-    
 
     # -- MASK
     patch_size = args['mask']['patch_size']  # patch-size for model training
@@ -231,10 +226,7 @@ def main(args):
     transform = make_transforms(
         crop_size=crop_size,
         crop_scale=crop_scale,
-        gaussian_blur=use_gaussian_blur,
-        horizontal_flip=use_horizontal_flip,
-        color_distortion=use_color_distortion,
-        color_jitter=color_jitter_strength)
+    )
 
     # -- init data-loaders/samplers
     if "BraTS2021_slice" in image_folder:
@@ -264,7 +256,21 @@ def main(args):
                 root_path=data_root_folder_path,
                 image_folder=image_folder,
                 drop_last=True
-        )       
+        )
+    elif "RESC" in image_folder:
+        # RESC dataset
+        _, unsupervised_loader, unsupervised_sampler = make_resc(
+                transform=transform,
+                batch_size=batch_size,
+                collator=mask_collator,
+                pin_mem=pin_mem,
+                num_workers=num_workers,
+                world_size=world_size,
+                rank=rank,
+                root_path=data_root_folder_path,
+                image_folder=image_folder,
+                drop_last=True
+        )  
 
     ipe = len(unsupervised_loader)
     print("Number of instances per epoch = ", ipe)

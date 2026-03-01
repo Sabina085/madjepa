@@ -21,19 +21,13 @@ data:
   batch_size: 32
   crop_size: 224
   crop_scale:
-  - 0.3
+  - 0.8
   - 1.0
-
+  
   image_folder: BraTS2021_slice/train/
-  data_root_folder_path: /home/vhondru/istoian/BMAD/dataset
+  data_root_folder_path: /media/vhondru/hdd/istoian/BMAD/dataset
   pin_mem: True
   num_workers: 10
-
-  # data augmentation / transformations
-  color_jitter_strength: 0.0
-  use_color_distortion: false
-  use_gaussian_blur: false
-  use_horizontal_flip: false
 
 
 mask:
@@ -78,5 +72,5 @@ optimization:
 
 
 logging:
-  logging_folder: experiments_BraTS2021_slice/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization/logs/
-  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization
+  logging_folder: experiments_BraTS2021_slice/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training/logs/
+  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped

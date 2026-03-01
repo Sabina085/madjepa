@@ -60,7 +60,7 @@ class BrainMRI(torchvision.datasets.ImageFolder):
         """
         BrainMRI
 
-        :param root: root network directory for ImageNet data
+        :param root: root network directory for Brain MRI data
         :param image_folder: path to images inside root network directory
         """
 

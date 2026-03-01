@@ -9,7 +9,8 @@ from pathlib import Path
 
 from torchvision import transforms
 
-from src.utils.utils_evaluation import *
+from src.utils.inference import *
+from src.utils.dataset import *
 from src.helper import (
     load_models_from_checkpoint,
     init_model_dinov3
@@ -23,15 +24,15 @@ root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
 ###  To modify these configuration values
-DATASET_NAME = "hist_DIY"
-EXPERIMENT_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization_batch_size_128"
-CONFIG_NAME = "hist_DIY_enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization.yaml"
+DATASET_NAME = "BraTS2021_slice"
+EXPERIMENT_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training"
+CONFIG_NAME = "BraTS2021_slice_enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization.yaml"
 SPLIT = "valid"
 # How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
 DISTANCE = "l2"
 # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
-SAVE_IMAGES_WITH_MASKS = False
+SAVE_IMAGES_WITH_MASKS = True
 ###
 
 EVALUATION_DATASET_PATH = f"/media/vhondru/hdd/istoian/BMAD/dataset/{DATASET_NAME}/{SPLIT}"
@@ -56,6 +57,11 @@ DISTANCES_RESULTS_CSV_PATH = (
 SAVE_PER_PATCH_RESULTS_FOLDER = (
     f"{EXPERIMENT_FOLDER_PATH}/"
     f"image_per_patch_{DISTANCE}_distances_{NUM_TARGET_BOXES_PER_IMAGE}_seeds/"
+)
+
+SAVE_CROPPED_BORDERS_DICT_FOLDER = (
+    f"{EXPERIMENT_FOLDER_PATH}/"
+    "cropped_borders_dicts/"
 )
 
 
@@ -141,7 +147,7 @@ def main():
         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     ])
     mask_transform = transforms.Compose([
-        transforms.Resize((crop_size, crop_size), Image.NEAREST),
+        # transforms.Resize((crop_size, crop_size), Image.NEAREST),
         transforms.ToTensor()
     ])
 
@@ -179,6 +185,7 @@ def main():
     list_distances_per_image = []
     list_labels = []
     list_seeds = []
+    list_cropped_borders_dicts = []
 
     # -- used for building the anomaly map
     num_patches = (crop_size // patch_size) * (crop_size // patch_size)
@@ -194,11 +201,11 @@ def main():
             scale=target_block_scale,
             aspect_ratio_scale=target_block_aspect_ratio)
         
-        for _, (images, segmentation_masks, labels, image_name) in enumerate(eval_loader):
-            images = images.to(device)
-            labels = labels.to(device)
+        for _, (image, segmentation_mask, label, image_name, borders_dict) in enumerate(eval_loader):
+            image = image.to(device)
+            label = label.to(device)
             image_name = image_name[0].split('.')[0]
-            segmentation_masks = np.squeeze(np.asarray(segmentation_masks))
+            segmentation_mask = np.squeeze(np.asarray(segmentation_mask))
 
             if box_idx == 0:
                 image_per_patch_distances[image_name] = {patch_idx: [] for patch_idx in range(num_patches)}
@@ -232,7 +239,6 @@ def main():
                 min_keep=enc_min_keep
             ).to(device)]
 
-
             if SAVE_IMAGES_WITH_MASKS and (seed == 0): # save examples of sampled boxes / images only for the first seed
                 # Save the image using the encoder context mask
                 encoder_context_mask_arr = transform_from_mask_to_box(
@@ -247,11 +253,11 @@ def main():
 
                 ### Code used for saving the generated input boxes (not essential, can be removed)
                 # Saving the original input image (unmasked)
-                image_arr = inverse_image_transform(images[0, :, :, :]).detach().cpu().numpy()
+                image_arr = inverse_image_transform(image[0, :, :, :]).detach().cpu().numpy()
                 Image.fromarray((255 * np.transpose(image_arr, (1, 2, 0)))\
                     .astype("uint8")).convert("RGB")\
                     .save(f"{RANDOM_BOXES_PATH}/{image_name}_image.png")
-                Image.fromarray((255 * np.transpose(images[0, :, :, :].detach().cpu().numpy(), (1, 2, 0)))\
+                Image.fromarray((255 * np.transpose(image[0, :, :, :].detach().cpu().numpy(), (1, 2, 0)))\
                     .astype("uint8")).convert("RGB")\
                     .save(f"{RANDOM_BOXES_PATH}/{image_name}_normalized_image.png")
     
@@ -278,7 +284,7 @@ def main():
             with torch.no_grad():
                 # --- Target encoder forward prop
                 # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
-                target_encoder_emb = target_encoder.forward(images)
+                target_encoder_emb = target_encoder.forward(image)
                 # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
                 # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
                 # retrieve the batch size
@@ -289,7 +295,7 @@ def main():
                 target_encoder_emb = repeat_interleave_batch(target_encoder_emb, B, repeat=1)
 
                 # --- (Context) Encoder forward prop
-                encoder_emb = encoder.forward(images, encoder_mask)
+                encoder_emb = encoder.forward(image, encoder_mask)
 
                 # --- Predictor forward prop
                 predictor_emb = predictor.forward(encoder_emb, encoder_mask, list_masks_target_encoder)
@@ -305,13 +311,14 @@ def main():
                     return               
 
                 distance_per_image = torch.mean(input=distance_per_embedding, dim=1, keepdim=False)
-                list_distances_per_image.append(distance_per_image.item())
+                list_distances_per_image.append(distance_per_image.detach().item())
 
                 list_image_names.append(image_name)
                 list_box_sizes.append((target_block_h * patch_size, target_block_w * patch_size))
-                list_labels.append(labels.item())
+                list_labels.append(label.detach().item())
                 list_seeds.append(seed)
-                list_segmentation_masks.append(segmentation_masks)
+                list_segmentation_masks.append(segmentation_mask)
+                list_cropped_borders_dicts.append(borders_dict)
 
                 # Get distances per patch embedding for building an anomaly map
                 if DISTANCE == "l2":
@@ -330,9 +337,9 @@ def main():
 
         try:
             print("seed: ", seed)
-            print(f"Mean {DISTANCE} anomaly images mean: ", statistics.mean(
+            print(f"Mean {DISTANCE} anomaly images mean: ", np.mean(
                 [distance for distance, label in zip(list_distances_per_image, list_labels) if label == 1]))
-            print(f"Mean {DISTANCE} normal images mean: ", statistics.mean(
+            print(f"Mean {DISTANCE} normal images mean: ", np.mean(
                 [distance for distance, label in zip(list_distances_per_image, list_labels) if label == 0]))
         except Exception as e:
             print(f"Error when computing the mean distance per image: {e}")
@@ -352,13 +359,21 @@ def main():
 
     if not os.path.exists(SAVE_PER_PATCH_RESULTS_FOLDER):
         os.makedirs(SAVE_PER_PATCH_RESULTS_FOLDER, exist_ok=True)
+    
+    if not os.path.exists(SAVE_CROPPED_BORDERS_DICT_FOLDER):
+        os.makedirs(SAVE_CROPPED_BORDERS_DICT_FOLDER, exist_ok=True)
 
-    for image_name, label, segmentation_mask in zip(list_image_names, list_labels, list_segmentation_masks):
-        
+    for image_name, label, segmentation_mask, cropped_border_dict in zip(list_image_names, list_labels, list_segmentation_masks, list_cropped_borders_dicts):
+
         save_dict_path = os.path.join(SAVE_PER_PATCH_RESULTS_FOLDER, image_name + "_distances_label" + "_" + str(label) + ".json")
         with open(save_dict_path, "w") as f:
             json.dump(image_per_patch_distances[image_name], f)
         
+        save_borders_dict_path = os.path.join(SAVE_CROPPED_BORDERS_DICT_FOLDER, image_name + "_cropped_borders_dict_label" + "_" + str(label) + ".json")
+        with open(save_borders_dict_path, "w") as f:
+            cropped_border_dict = {k: v.item() for k, v in cropped_border_dict.items()}
+            json.dump(cropped_border_dict, f)
+
         save_segmentation_path = os.path.join(SAVE_PER_PATCH_RESULTS_FOLDER, image_name + "_segmentation_mask_label_" + str(label) + ".npy")
         np.save(file=save_segmentation_path, arr=segmentation_mask)
 

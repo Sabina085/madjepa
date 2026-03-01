@@ -1,18 +1,11 @@
 from typing import Dict, Tuple, List
 from collections import Counter
+
 import numpy as np
-from torch.utils.data import Dataset
-from PIL import Image
-import os
-import statistics
-import glob
-import cv2
 import torch
 import random
-from src.masks.multiblock import MaskCollator
 
-label2idx = {"good": 0, "ungood": 1}
-idx2label = {0: "good", 1: "ungood"}
+from src.masks.multiblock import MaskCollator
 
 
 def get_custom_target_anomaly_and_normal_box(
@@ -175,8 +168,6 @@ def sample_context(
             scale=enc_mask_scale,
             aspect_ratio_scale=aspect_ratio
         )
-        # print("context_height: ", context_height)
-        # print("context_width: ", context_width)
 
         np.random.seed(it)
         start_height = np.random.randint(low=0, high=image_height - context_height)
@@ -201,160 +192,3 @@ def sample_context(
             return torch.unsqueeze(encoder_mask, 0)
         else:
             it += 1
-
-def zscore_sigmoid(anomaly_map, eps=1e-8):
-    """
-    Z-score + sigmoid normalization for a 2D NumPy anomaly map.
-
-    Args:
-        anomaly_map (np.ndarray): 2D array of real-valued anomaly scores
-        eps (float): numerical stability constant
-
-    Returns:
-        np.ndarray: anomaly map normalized to [0, 1]
-    """
-
-    anomaly_map = anomaly_map.astype(np.float32)
-    mean = anomaly_map.mean()
-    std = anomaly_map.std()
-
-    z = (anomaly_map - mean) / (std + eps)
-
-    return 1.0 / (1.0 + np.exp(-z))
-
-def build_anomaly_map(
-        per_patch_distances_dict: Dict[str, List[float]],
-        image_height: int,
-        image_width: int,
-        patch_size: int,
-        agg_strategy: str= "mean"
-    ):
-    num_patches_width = image_width // patch_size
-
-    anomaly_map = np.zeros((image_height, image_width))
-    for patch_idx, distances in per_patch_distances_dict.items():
-        if len(distances) > 0:
-            if agg_strategy == "mean":
-                aggregated_distance_per_patch = statistics.mean(distances)
-            else:
-                aggregated_distance_per_patch = max(distances)
-
-            row = patch_idx // num_patches_width
-            col = patch_idx % num_patches_width
-            
-            anomaly_map[
-                row * patch_size: (row + 1) * patch_size,
-                col * patch_size: (col + 1) * patch_size] = aggregated_distance_per_patch
-    
-    return anomaly_map
-
-def build_anomaly_map_interpolation(
-        per_patch_distances_dict: Dict[str, List[float]],
-        image_height: int,
-        image_width: int,
-        patch_size: int,
-        agg_strategy: str= "mean"
-    ):
-    num_patches_height = image_height // patch_size
-    num_patches_width = image_width // patch_size
-
-    patches_anomaly_map = np.zeros((num_patches_height, num_patches_width))
-    for patch_idx, distances in per_patch_distances_dict.items():
-        if len(distances) > 0:
-            if agg_strategy == "mean":
-                aggregated_distance_per_patch = statistics.mean(distances)
-            else:
-                aggregated_distance_per_patch = max(distances)
-
-            row = int(patch_idx) // num_patches_width
-            col = int(patch_idx) % num_patches_width
-            patches_anomaly_map[row, col] = aggregated_distance_per_patch
-
-    anomaly_map = cv2.resize(
-        patches_anomaly_map, dsize=(image_height, image_width), interpolation=cv2.INTER_LINEAR)
-
-    return anomaly_map
-
-
-class SegmentationWithLabelDataset(Dataset):
-    def __init__(self, images_dir, transform=None, mask_transform=None):
-        self.images_dir = images_dir
-        self.transform = transform
-        self.mask_transform = mask_transform
-
-        # images
-        self.all_paths = sorted(glob.glob(os.path.join(images_dir, "**/*.png"), recursive=True))
-        self.images = [img_path for img_path in self.all_paths if 'label' not in img_path]
-        self.image_names = [img_path.split("/")[-1] for img_path in self.images]
-
-        # segmentation masks
-        self.masks = [img_path.replace("img", "label") for img_path in self.images]
-            
-        # labels     
-        self.labels_names = [img_path.split("/")[-3] for img_path in self.images]
-        self.labels = [label2idx[label_name] for label_name in self.labels_names]
-
-    def __len__(self):
-        return len(self.images)
-
-    def __getitem__(self, idx):
-        # load image
-        img_path = self.images[idx]
-        img_name = self.image_names[idx]
-        image = Image.open(img_path).convert("RGB")
-
-        # load mask
-        mask_path = self.masks[idx]
-        mask = Image.open(mask_path).convert("L")
-            
-        # load label
-        label = self.labels[idx]
-
-        # apply transformations
-        if self.transform:
-            image = self.transform(image)
-        if self.mask_transform:
-            mask = self.mask_transform(mask)
-            # Preprocessing the segmentation masks: from BMAD codebase: https://github.com/DorisBao/BMAD/blob/main/UTRAD/data.py#L130
-            mask[mask >= 0.1] = 1
-            mask[mask < 0.1] = 0
-
-        return image, mask, label, img_name
-    
-
-class LabelDataset(Dataset):
-    # This is a simpler version of the dataset. It does not include segmentation masks, only the image and the label.
-    def __init__(self, images_dir, transform=None):
-        self.images_dir = images_dir
-        self.transform = transform
-
-        # images
-        self.all_paths = sorted(glob.glob(os.path.join(images_dir, "**/*.png"), recursive=True))
-        self.images = [img_path for img_path in self.all_paths if 'label' not in img_path]
-        self.image_names = [img_path.split("/")[-1] for img_path in self.images]
-            
-        # labels     
-        self.labels_names = [img_path.split("/")[-3] for img_path in self.images]
-        self.labels = [label2idx[label_name] for label_name in self.labels_names]
-
-    def __len__(self):
-        return len(self.images)
-
-    def __getitem__(self, idx):
-        # load image
-        img_path = self.images[idx]
-        img_name = self.image_names[idx]
-        image = Image.open(img_path).convert("RGB")
-            
-        # load label
-        label = self.labels[idx]
-
-        # apply transforms
-        if self.transform:
-            image = self.transform(image)
-
-        return image, label, img_name
-
-def cvt2heatmap(gray):
-    heatmap = cv2.applyColorMap(gray, cv2.COLORMAP_JET)
-    return heatmap

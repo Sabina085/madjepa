@@ -13,19 +13,19 @@ root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
 ###  To modify these configuration values
-DATASET_NAME = "hist_DIY"
+DATASET_NAME = "BraTS2021_slice"
 SPLIT = "valid"
-AGGREGATE_PATCHES_STRATEGY = "max"
+AGGREGATE_PATCHES_STRATEGY = "mean"
 NUM_TARGET_BOXES_PER_IMAGE = 30
 GAUSSIAN_FILTER_BLUR_SIGMA = 4
 DISTANCE = "l2"
 # COUNT_ANOMALY_PIXELS_IN_CONTEXT = 10
 
 # For computing the image-level metrics
-PER_IMAGE_STATISTIC = "mean"
+PER_IMAGE_STATISTIC = "max"
 ###
 
-EXPERIMENT_FOLDER_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization_ema_0.998"
+EXPERIMENT_FOLDER_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training"
 
 EXPERIMENT_FOLDER_PATH = (
     f"/{root_directory_path}/{current_dir}/"

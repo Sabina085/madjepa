@@ -6,67 +6,46 @@
 #
 
 from logging import getLogger
+from src.utils.preprocessing import get_image_background_borders
 
-from PIL import ImageFilter
+from PIL import Image
+import numpy as np
+import uuid
 
-import torch
 import torchvision.transforms as transforms
 
 logger = getLogger()
 
-
 def make_transforms(
     crop_size=224,
-    crop_scale=(0.3, 1.0),
-    color_jitter=1.0,
-    horizontal_flip=False,
-    color_distortion=False,
-    gaussian_blur=False,
-    # BrainMRI normalization statistics
-    # normalization=((0.1129, 0.1240, 0.1445),
-    #                (0.0392, 0.0495, 0.0612))
-    
-    # ImageNet normalization statistics - need to check if they lead to better results
+    crop_scale=(0.8, 1.0),
+    # ImageNet normalization statistics
     normalization=((0.485, 0.456, 0.406),
                    (0.229, 0.224, 0.225))
 ):
-    logger.info('making imagenet data transforms')
+    logger.info('Applying imagenet stats for normalization')
 
-    def get_color_distortion(s=1.0):
-        # s is the strength of color distortion.
-        color_jitter = transforms.ColorJitter(0.8*s, 0.8*s, 0.8*s, 0.2*s)
-        rnd_color_jitter = transforms.RandomApply([color_jitter], p=0.8)
-        rnd_gray = transforms.RandomGrayscale(p=0.2)
-        color_distort = transforms.Compose([
-            rnd_color_jitter,
-            rnd_gray])
-        return color_distort
-
-    transform_list = []
-    transform_list += [transforms.RandomResizedCrop(crop_size, scale=crop_scale)]
-    if horizontal_flip:
-        transform_list += [transforms.RandomHorizontalFlip()]
-    if color_distortion:
-        transform_list += [get_color_distortion(s=color_jitter)]
-    if gaussian_blur:
-        transform_list += [GaussianBlur(p=0.5)]
+    transform_list = [CropBackgroundBordersTransform()]
+    # transform_list += [transforms.Resize((crop_size, crop_size), Image.BICUBIC)]
+    transform_list += [transforms.RandomResizedCrop(
+        crop_size, scale=crop_scale, 
+        interpolation=transforms.InterpolationMode.BICUBIC)]
     transform_list += [transforms.ToTensor()]
     transform_list += [transforms.Normalize(mean=normalization[0], std=normalization[1])]
 
     transform = transforms.Compose(transform_list)
+
     return transform
 
+class CropBackgroundBordersTransform:
+    def __call__(self, image, count_border_pixels=2):
+        # image is PIL Image
+        # convert to numpy array
+        image_arr = np.array(image)
+        borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=count_border_pixels)
+        cropped_img = image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
+        # uid = uuid.uuid4()
+        # image.save(f"Test_cropped_images/{uid}_original.jpg")
+        # cropped_img.save(f"Test_cropped_images/{uid}_cropped.jpg")
 
-class GaussianBlur(object):
-    def __init__(self, p=0.5, radius_min=0.1, radius_max=2.):
-        self.prob = p
-        self.radius_min = radius_min
-        self.radius_max = radius_max
-
-    def __call__(self, img):
-        if torch.bernoulli(torch.tensor(self.prob)) == 0:
-            return img
-
-        radius = self.radius_min + torch.rand(1) * (self.radius_max - self.radius_min)
-        return img.filter(ImageFilter.GaussianBlur(radius=radius))
-    
+        return cropped_img

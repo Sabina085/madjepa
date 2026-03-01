@@ -9,7 +9,8 @@ from PIL import Image
 import torch.nn.functional as F
 from torchvision import transforms
 
-from src.utils.utils_evaluation import *
+from src.utils.inference import *
+from src.utils.dataset import *
 from src.helper import (
     load_models_from_checkpoint,
     init_model_dinov3
