@@ -182,7 +182,8 @@ def main():
     list_box_sizes = []
     list_image_names = []
     list_segmentation_masks = []
-    list_distances_per_image = []
+    list_mean_distances_per_image = []
+    list_max_distances_per_image = []
     list_labels = []
     list_seeds = []
     list_cropped_borders_dicts = []
@@ -308,10 +309,13 @@ def main():
                     distance_per_embedding = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=1, dim=2)
                 else:
                     print("Distance metric is not correct! Set DISTANCE to one of the following options: l1, l2")
-                    return               
+                    return          
 
-                distance_per_image = torch.mean(input=distance_per_embedding, dim=1, keepdim=False)
-                list_distances_per_image.append(distance_per_image.detach().item())
+                mean_distance_per_image = torch.mean(input=distance_per_embedding, dim=1, keepdim=False)
+                list_mean_distances_per_image.append(mean_distance_per_image.detach().item())
+
+                max_distance_per_image = torch.max(input=distance_per_embedding, dim=1, keepdim=False)
+                list_max_distances_per_image.append(max_distance_per_image.values.detach().item())
 
                 list_image_names.append(image_name)
                 list_box_sizes.append((target_block_h * patch_size, target_block_w * patch_size))
@@ -338,16 +342,21 @@ def main():
         try:
             print("seed: ", seed)
             print(f"Mean {DISTANCE} anomaly images mean: ", np.mean(
-                [distance for distance, label in zip(list_distances_per_image, list_labels) if label == 1]))
+                [distance for distance, label in zip(list_mean_distances_per_image, list_labels) if label == 1]))
             print(f"Mean {DISTANCE} normal images mean: ", np.mean(
-                [distance for distance, label in zip(list_distances_per_image, list_labels) if label == 0]))
+                [distance for distance, label in zip(list_mean_distances_per_image, list_labels) if label == 0]))
+            print(f"Mean {DISTANCE} anomaly images max: ", np.mean(
+                [distance for distance, label in zip(list_max_distances_per_image, list_labels) if label == 1]))
+            print(f"Mean {DISTANCE} normal images max: ", np.mean(
+                [distance for distance, label in zip(list_max_distances_per_image, list_labels) if label == 0]))
         except Exception as e:
             print(f"Error when computing the mean distance per image: {e}")
 
     df = pd.DataFrame({
         "image_name": list_image_names,
         "label": list_labels,
-        f"{DISTANCE}_distance": list_distances_per_image,
+        f"mean_{DISTANCE}_distance": list_mean_distances_per_image,
+        f"max_{DISTANCE}_distance": list_max_distances_per_image,
         "box_size": list_box_sizes,
         "seed": list_seeds
     })
