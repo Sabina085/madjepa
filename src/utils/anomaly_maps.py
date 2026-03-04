@@ -129,7 +129,7 @@ def build_anomaly_map_interpolation(
     model_res_map = cv2.resize(
         patches_anomaly_map, 
         dsize=(model_input_width, model_input_height), 
-        interpolation=cv2.INTER_NEAREST
+        interpolation=interpolation_method
     )
 
     # 3. Smooth and Resize to the actual crop dimensions

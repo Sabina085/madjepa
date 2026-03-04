@@ -21,7 +21,7 @@ data:
   batch_size: 32
   crop_size: 224
   crop_scale:
-  - 0.3
+  - 0.8
   - 1.0
 
   image_folder: RESC/train/
@@ -72,5 +72,5 @@ optimization:
 
 
 logging:
-  logging_folder: experiments_RESC/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped/logs/
-  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped
+  logging_folder: experiments_RESC/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training/logs/
+  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training
