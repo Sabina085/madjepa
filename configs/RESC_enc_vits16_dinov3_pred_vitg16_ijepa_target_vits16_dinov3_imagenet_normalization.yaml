@@ -23,6 +23,8 @@ data:
   crop_scale:
   - 0.8
   - 1.0
+  # the border of background pixels left in the input image after ROI cropping
+  count_border_pixels: 10
 
   image_folder: RESC/train/
   data_root_folder_path: /media/vhondru/hdd/istoian/BMAD/dataset
@@ -67,10 +69,10 @@ optimization:
   final_lr: 1.0e-06
   warmup: 3
 
-  weight_decay: 0.04
-  final_weight_decay: 0.4
+  weight_decay: 0.001
+  final_weight_decay: 0.01
 
 
 logging:
-  logging_folder: experiments_RESC/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training/logs/
-  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training
+  logging_folder: experiments_RESC/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training_low_wd/logs/
+  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training_low_wd

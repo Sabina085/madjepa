@@ -13,7 +13,7 @@ root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
 ###  To modify these configuration values
-DATASET_NAME = "BraTS2021_slice"
+DATASET_NAME = "RESC"
 SPLIT = "valid"
 AGGREGATE_PATCHES_STRATEGY = "mean"
 NUM_TARGET_BOXES_PER_IMAGE = 30

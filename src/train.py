@@ -109,6 +109,7 @@ def main(args):
     batch_size = args['data']['batch_size']
     crop_size = args['data']['crop_size']
     crop_scale = args['data']['crop_scale']
+    count_border_pixels = args['data']['count_border_pixels']
 
     image_folder = args['data']['image_folder']
     data_root_folder_path = args['data']['data_root_folder_path']
@@ -174,6 +175,8 @@ def main(args):
     else:
         load_path = None
 
+    dataset_name = image_folder.split("/")[0]
+
     # -- make csv_logger
     csv_logger = CSVLogger(log_file,
                            ('%d', 'epoch'),
@@ -226,6 +229,8 @@ def main(args):
     transform = make_transforms(
         crop_size=crop_size,
         crop_scale=crop_scale,
+        dataset_name=dataset_name,
+        count_border_pixels=count_border_pixels
     )
 
     # -- init data-loaders/samplers

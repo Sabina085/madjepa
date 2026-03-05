@@ -24,9 +24,9 @@ root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
 ###  To modify these configuration values
-DATASET_NAME = "BraTS2021_slice"
+DATASET_NAME = "RESC"
 EXPERIMENT_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training"
-CONFIG_NAME = "BraTS2021_slice_enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization.yaml"
+CONFIG_NAME = "RESC_enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization.yaml"
 SPLIT = "valid"
 # How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
@@ -93,6 +93,7 @@ def main():
     # --- data transforms
     crop_size = config["data"]["crop_size"]
     patch_size = config["mask"]["patch_size"]
+    count_border_pixels = config["data"]["count_border_pixels"]
 
     # -- target blocks / masks
     target_block_scale = config["mask"]["pred_mask_scale"]
@@ -141,13 +142,10 @@ def main():
     image_transform = transforms.Compose([
         transforms.Resize((crop_size, crop_size), Image.BICUBIC),
         transforms.ToTensor(),
-        # BrainMRI statistics
-        # transforms.Normalize(mean=(0.1129, 0.1240, 0.1445), std=(0.0392, 0.0495, 0.0612)),
-        # ImageNet statistics
         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     ])
+
     mask_transform = transforms.Compose([
-        # transforms.Resize((crop_size, crop_size), Image.NEAREST),
         transforms.ToTensor()
     ])
 
@@ -162,6 +160,8 @@ def main():
     
     eval_dataset = SegmentationWithLabelDataset(
         images_dir=EVALUATION_DATASET_PATH,
+        dataset_name=DATASET_NAME,
+        count_border_pixels=count_border_pixels,
         transform=image_transform,
         mask_transform=mask_transform)
 

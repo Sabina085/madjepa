@@ -6,29 +6,33 @@
 #
 
 from logging import getLogger
-from src.utils.preprocessing import get_image_background_borders
+from src.utils.preprocessing import *
 
 from PIL import Image
 import numpy as np
 import uuid
+import json
 
 import torchvision.transforms as transforms
 
 logger = getLogger()
 
 def make_transforms(
+    dataset_name,
     crop_size=224,
     crop_scale=(0.8, 1.0),
     # ImageNet normalization statistics
     normalization=((0.485, 0.456, 0.406),
-                   (0.229, 0.224, 0.225))
+                   (0.229, 0.224, 0.225)),
+    count_border_pixels=2
 ):
     logger.info('Applying imagenet stats for normalization')
 
-    transform_list = [CropBackgroundBordersTransform()]
+    transform_list = [CropBackgroundBordersTransform(dataset_name, count_border_pixels)]
     # transform_list += [transforms.Resize((crop_size, crop_size), Image.BICUBIC)]
     transform_list += [transforms.RandomResizedCrop(
-        crop_size, scale=crop_scale, 
+        crop_size, 
+        scale=crop_scale, 
         interpolation=transforms.InterpolationMode.BICUBIC)]
     transform_list += [transforms.ToTensor()]
     transform_list += [transforms.Normalize(mean=normalization[0], std=normalization[1])]
@@ -38,14 +42,22 @@ def make_transforms(
     return transform
 
 class CropBackgroundBordersTransform:
-    def __call__(self, image, count_border_pixels=2):
+    def __init__(self, dataset_name, count_border_pixels=2):
+        self.dataset_name=dataset_name
+        self.count_border_pixels = count_border_pixels
+
+    def __call__(self, image):
         # image is PIL Image
         # convert to numpy array
         image_arr = np.array(image)
-        borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=count_border_pixels)
+        if self.dataset_name == "RESC":
+            image_arr = remove_noise(image_arr)
+        borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
         cropped_img = image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
         # uid = uuid.uuid4()
-        # image.save(f"Test_cropped_images/{uid}_original.jpg")
-        # cropped_img.save(f"Test_cropped_images/{uid}_cropped.jpg")
+        # image.save(f"Test_cropped_images_RESC_valid/{uid}_original.jpg")
+        # cropped_img.save(f"Test_cropped_images_RESC_valid/{uid}_cropped.jpg")
+        # with open(f"Test_cropped_images_RESC_valid/{uid}_borders_dict.json", "w") as f:
+        #     json.dump(borders_dict, f)
 
         return cropped_img

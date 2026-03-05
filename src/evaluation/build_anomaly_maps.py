@@ -15,11 +15,11 @@ root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
 ###  To modify these configuration values
-DATASET_NAME = "BraTS2021_slice"
+DATASET_NAME = "RESC"
 SPLIT = "valid"
 # How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
-AGGREGATE_PATCHES_STRATEGY = "mean"
+AGGREGATE_PATCHES_STRATEGY = "max"
 GAUSSIAN_FILTER_BLUR_SIGMA = 4
 DISTANCE = "l2"
 # COUNT_ANOMALY_PIXELS_IN_CONTEXT = 10

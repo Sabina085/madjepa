@@ -1,5 +1,7 @@
+import cv2
 import numpy as np
 from typing import Dict
+
 
 def get_image_background_borders(image_arr: np.ndarray, count_border_pixels=2) -> Dict[str, int]:
     num_rows, num_cols = image_arr.shape[:2]
@@ -39,3 +41,22 @@ def get_image_background_borders(image_arr: np.ndarray, count_border_pixels=2) -
         "original_image_height": num_rows,
         "original_image_width": num_cols
     }
+
+def remove_noise(image_original: np.ndarray):
+    if image_original.ndim == 3:
+        image = image_original[:, :, 0]
+    else:
+        image=image_original
+
+    # Otsu's Thresholding
+    # This automatically finds the best threshold value to separate background from foreground
+    _, image_otsu = cv2.threshold(
+        image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+
+    # Removes small "salt and pepper" noise from the thresholded mask
+    kernel = np.ones((3,3), np.uint8)
+    image_otsu = cv2.morphologyEx(image_otsu, cv2.MORPH_OPEN, kernel)
+    image_clean = cv2.medianBlur(image_otsu, 3)
+
+    return image_clean
