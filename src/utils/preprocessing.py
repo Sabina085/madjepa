@@ -46,7 +46,7 @@ def remove_noise(image_original: np.ndarray):
     if image_original.ndim == 3:
         image = image_original[:, :, 0]
     else:
-        image=image_original
+        image = image_original
 
     # Otsu's Thresholding
     # This automatically finds the best threshold value to separate background from foreground
@@ -57,6 +57,6 @@ def remove_noise(image_original: np.ndarray):
     # Removes small "salt and pepper" noise from the thresholded mask
     kernel = np.ones((3,3), np.uint8)
     image_otsu = cv2.morphologyEx(image_otsu, cv2.MORPH_OPEN, kernel)
-    image_clean = cv2.medianBlur(image_otsu, 3)
+    image_clean = cv2.medianBlur(image_otsu, 5)
 
     return image_clean

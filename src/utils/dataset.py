@@ -110,6 +110,7 @@ class LabelDataset(Dataset):
 
 
 class ImageDataset(Dataset):
+     # This is a simpler version of the dataset. It does not include segmentation masks or classification labels, only the images.
     def __init__(self, images_dir, dataset_name, count_border_pixels, transform=None):
         self.images_dir = images_dir
         self.transform = transform

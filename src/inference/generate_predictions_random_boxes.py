@@ -26,7 +26,6 @@ current_dir = subpath_list[-1]
 ###  To modify these configuration values
 DATASET_NAME = "RESC"
 EXPERIMENT_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training"
-CONFIG_NAME = "RESC_enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_imagenet_normalization.yaml"
 SPLIT = "valid"
 # How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
@@ -42,7 +41,10 @@ EXPERIMENT_FOLDER_PATH = (
     f"experiments_{DATASET_NAME}/{EXPERIMENT_NAME}/results_{SPLIT}"
 )
 
-CONFIG_PATH = f"/{root_directory_path}/{current_dir}/configs/{CONFIG_NAME}"
+CONFIG_PATH = (
+    f"/{root_directory_path}/{current_dir}/"
+    f"experiments_{DATASET_NAME}/{EXPERIMENT_NAME}/logs/config_run.yaml"
+)
 
 CKPT_FOLDER_PATH = EXPERIMENT_FOLDER_PATH.replace(f"results_{SPLIT}", "checkpoints")
 CKPT_FILE_PATH = f"{CKPT_FOLDER_PATH}/{EXPERIMENT_NAME}-latest.pth.tar"
@@ -181,7 +183,6 @@ def main():
 
     list_box_sizes = []
     list_image_names = []
-    list_segmentation_masks = []
     list_mean_distances_per_image = []
     list_max_distances_per_image = []
     list_labels = []
@@ -202,11 +203,10 @@ def main():
             scale=target_block_scale,
             aspect_ratio_scale=target_block_aspect_ratio)
         
-        for _, (image, segmentation_mask, label, image_name, borders_dict) in enumerate(eval_loader):
+        for _, (image, _, label, image_name, borders_dict) in enumerate(eval_loader):
             image = image.to(device)
             label = label.to(device)
             image_name = image_name[0].split('.')[0]
-            segmentation_mask = np.squeeze(np.asarray(segmentation_mask))
 
             if box_idx == 0:
                 image_per_patch_distances[image_name] = {patch_idx: [] for patch_idx in range(num_patches)}
@@ -321,7 +321,6 @@ def main():
                 list_box_sizes.append((target_block_h * patch_size, target_block_w * patch_size))
                 list_labels.append(label.detach().item())
                 list_seeds.append(seed)
-                list_segmentation_masks.append(segmentation_mask)
                 list_cropped_borders_dicts.append(borders_dict)
 
                 # Get distances per patch embedding for building an anomaly map
@@ -341,13 +340,13 @@ def main():
 
         try:
             print("seed: ", seed)
-            print(f"Mean {DISTANCE} anomaly images mean: ", np.mean(
+            print(f"Current mean {DISTANCE} anomaly images mean: ", np.mean(
                 [distance for distance, label in zip(list_mean_distances_per_image, list_labels) if label == 1]))
-            print(f"Mean {DISTANCE} normal images mean: ", np.mean(
+            print(f"Current mean {DISTANCE} normal images mean: ", np.mean(
                 [distance for distance, label in zip(list_mean_distances_per_image, list_labels) if label == 0]))
-            print(f"Mean {DISTANCE} anomaly images max: ", np.mean(
+            print(f"Current mean {DISTANCE} anomaly images max: ", np.mean(
                 [distance for distance, label in zip(list_max_distances_per_image, list_labels) if label == 1]))
-            print(f"Mean {DISTANCE} normal images max: ", np.mean(
+            print(f"Current mean {DISTANCE} normal images max: ", np.mean(
                 [distance for distance, label in zip(list_max_distances_per_image, list_labels) if label == 0]))
         except Exception as e:
             print(f"Error when computing the mean distance per image: {e}")
@@ -372,7 +371,7 @@ def main():
     if not os.path.exists(SAVE_CROPPED_BORDERS_DICT_FOLDER):
         os.makedirs(SAVE_CROPPED_BORDERS_DICT_FOLDER, exist_ok=True)
 
-    for image_name, label, segmentation_mask, cropped_border_dict in zip(list_image_names, list_labels, list_segmentation_masks, list_cropped_borders_dicts):
+    for image_name, label, cropped_border_dict in zip(list_image_names, list_labels, list_cropped_borders_dicts):
 
         save_dict_path = os.path.join(SAVE_PER_PATCH_RESULTS_FOLDER, image_name + "_distances_label" + "_" + str(label) + ".json")
         with open(save_dict_path, "w") as f:
@@ -382,9 +381,6 @@ def main():
         with open(save_borders_dict_path, "w") as f:
             cropped_border_dict = {k: v.item() for k, v in cropped_border_dict.items()}
             json.dump(cropped_border_dict, f)
-
-        save_segmentation_path = os.path.join(SAVE_PER_PATCH_RESULTS_FOLDER, image_name + "_segmentation_mask_label_" + str(label) + ".npy")
-        np.save(file=save_segmentation_path, arr=segmentation_mask)
 
 
 if __name__ == "__main__":
