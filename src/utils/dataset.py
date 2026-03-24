@@ -57,11 +57,11 @@ class SegmentationWithLabelDataset(Dataset):
         borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
         image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
 
-        uid = uuid.uuid4()
-        original_image.save(f"Test_cropped_images_RESC_valid/{uid}_original.jpg")
-        image.save(f"Test_cropped_images_RESC_valid/{uid}_cropped.jpg")
-        with open(f"Test_cropped_images_RESC_valid/{uid}_borders_dict.json", "w") as f:
-            json.dump(borders_dict, f)
+        # uid = uuid.uuid4()
+        # original_image.save(f"Test_cropped_images_RESC_valid/{uid}_original.jpg")
+        # image.save(f"Test_cropped_images_RESC_valid/{uid}_cropped.jpg")
+        # with open(f"Test_cropped_images_RESC_valid/{uid}_borders_dict.json", "w") as f:
+        #     json.dump(borders_dict, f)
         
         # apply transformations
         if self.transform:
@@ -107,4 +107,41 @@ class LabelDataset(Dataset):
             image = self.transform(image)
 
         return image, label, img_name
+
+
+class ImageDataset(Dataset):
+    def __init__(self, images_dir, dataset_name, count_border_pixels, transform=None):
+        self.images_dir = images_dir
+        self.transform = transform
+        self.dataset_name = dataset_name
+        self.count_border_pixels = count_border_pixels
+
+        # images
+        self.all_paths = sorted(glob.glob(os.path.join(images_dir, "**/*.png"), recursive=True))
+        self.images = [img_path for img_path in self.all_paths if 'label' not in img_path]
+        self.image_names = [img_path.split("/")[-1] for img_path in self.images]
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        # load image
+        img_path = self.images[idx]
+        img_name = self.image_names[idx]
+        original_image = Image.open(img_path).convert("RGB")
+
+        # crop the background border from the image
+        image_arr = np.array(original_image)
+
+        if self.dataset_name == "RESC":
+            image_arr = remove_noise(image_arr)
+
+        borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
+        image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
+        
+        # apply transformations
+        if self.transform:
+            image = self.transform(image)
+
+        return image, img_name, borders_dict
     
