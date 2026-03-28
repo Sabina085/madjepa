@@ -56,12 +56,6 @@ class SegmentationWithLabelDataset(Dataset):
 
         borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
         image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
-
-        # uid = uuid.uuid4()
-        # original_image.save(f"Test_cropped_images_RESC_valid/{uid}_original.jpg")
-        # image.save(f"Test_cropped_images_RESC_valid/{uid}_cropped.jpg")
-        # with open(f"Test_cropped_images_RESC_valid/{uid}_borders_dict.json", "w") as f:
-        #     json.dump(borders_dict, f)
         
         # apply transformations
         if self.transform:
@@ -77,9 +71,11 @@ class SegmentationWithLabelDataset(Dataset):
 
 class LabelDataset(Dataset):
     # This is a simpler version of the dataset. It does not include segmentation masks, only the image and the label.
-    def __init__(self, images_dir, transform=None):
+    def __init__(self, images_dir, dataset_name, count_border_pixels, transform=None):
         self.images_dir = images_dir
         self.transform = transform
+        self.dataset_name = dataset_name
+        self.count_border_pixels = count_border_pixels
 
         # images
         self.all_paths = sorted(glob.glob(os.path.join(images_dir, "**/*.png"), recursive=True))
@@ -97,17 +93,25 @@ class LabelDataset(Dataset):
         # load image
         img_path = self.images[idx]
         img_name = self.image_names[idx]
-        image = Image.open(img_path).convert("RGB")
+        original_image = Image.open(img_path).convert("RGB")
             
         # load label
         label = self.labels[idx]
 
-        # apply transforms
+        # crop the background border from the image
+        image_arr = np.array(original_image)
+
+        if self.dataset_name == "RESC":
+            image_arr = remove_noise(image_arr)
+
+        borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
+        image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
+        
+        # apply transformations
         if self.transform:
             image = self.transform(image)
 
-        return image, label, img_name
-
+        return image, label, img_name, borders_dict
 
 class ImageDataset(Dataset):
      # This is a simpler version of the dataset. It does not include segmentation masks or classification labels, only the images.

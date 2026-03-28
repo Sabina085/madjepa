@@ -141,133 +141,135 @@ def main():
 
     config = read_config(config_path=CONFIG_PATH)
 
-    # Init DinoV3/I-Jepa models: (context) encoder (DinoV3) + predictor (I-Jepa checkpoint) + target_encoder (DinoV3 - same architecture as the context encoder)
-    dict_models = init_model_dinov3(
-        device=device,
-        encoder_model_name=config.encoder_model_name,
-        encoder_weights_path=config.encoder_weights_path,
-        predictor_depth=config.predictor_depth,
-        encoder_embed_dim=config.encoder_embed_dim,
-        predictor_embed_dim=config.predictor_embed_dim,
-        predictor_num_patches=(config.crop_size // config.patch_size) * (config.crop_size // config.patch_size),
-        predictor_num_heads=config.predictor_num_heads,
-        target_encoder_model_name=config.target_encoder_model_name,
-        target_encoder_weights_path=config.target_encoder_weights_path
-    )
+    with torch.inference_mode():
+        # Init DinoV3/I-Jepa models: (context) encoder (DinoV3) + predictor (I-Jepa checkpoint) + target_encoder (DinoV3 - same architecture as the context encoder)
+        dict_models = init_model_dinov3(
+            device=device,
+            encoder_model_name=config.encoder_model_name,
+            encoder_weights_path=config.encoder_weights_path,
+            predictor_depth=config.predictor_depth,
+            encoder_embed_dim=config.encoder_embed_dim,
+            predictor_embed_dim=config.predictor_embed_dim,
+            predictor_num_patches=(config.crop_size // config.patch_size) * (config.crop_size // config.patch_size),
+            predictor_num_heads=config.predictor_num_heads,
+            target_encoder_model_name=config.target_encoder_model_name,
+            target_encoder_weights_path=config.target_encoder_weights_path
+        )
 
-    # Load the pre-trained checkpoint (encoder + target encoder - DinoV3 VitS, predictor - IJepa checkpoint)
-    print(f"Loading checkpoint from: {CKPT_FILE_PATH}")
-    checkpoint_models = load_models_from_checkpoint(
-        checkpoint_path=CKPT_FILE_PATH,
-        encoder=dict_models["encoder"],
-        predictor=dict_models["predictor"],
-        target_encoder=dict_models["target_encoder"],
-        optimizer=None,
-        scaler=None,
-        dinov3_ckpt=True
-    )
-    encoder = checkpoint_models["encoder"]
-    predictor = checkpoint_models["predictor"]
-    target_encoder = checkpoint_models["target_encoder"]
+        # Load the pre-trained checkpoint (encoder + target encoder - DinoV3 VitS, predictor - IJepa checkpoint)
+        print(f"Loading checkpoint from: {CKPT_FILE_PATH}")
+        checkpoint_models = load_models_from_checkpoint(
+            checkpoint_path=CKPT_FILE_PATH,
+            encoder=dict_models["encoder"],
+            predictor=dict_models["predictor"],
+            target_encoder=dict_models["target_encoder"],
+            optimizer=None,
+            scaler=None,
+            dinov3_ckpt=True
+        )
+        encoder = checkpoint_models["encoder"]
+        predictor = checkpoint_models["predictor"]
+        target_encoder = checkpoint_models["target_encoder"]
 
-    inverse_image_transform, eval_loader = load_evaluation_dataset(config)
-    
-    print("Number of evaluation samples: ", len(eval_loader))
-
-    # Used for sampling the size of a target block
-    mask_collator = MaskCollator(
-        input_size=(config.crop_size, config.crop_size),
-        patch_size=config.patch_size
-    )
-    torch_generator = torch.Generator()
-
-    list_box_sizes = []
-    list_image_names = []
-    list_mean_distances_per_image = []
-    list_max_distances_per_image = []
-    list_labels = []
-    list_seeds = []
-    list_cropped_borders_dicts = []
-
-    # -- used for building the anomaly map
-    num_patches = (config.crop_size // config.patch_size) * (config.crop_size // config.patch_size)
-    image_per_patch_distances = {}
-    # --
-    
-    encoder.eval()
-    target_encoder.eval()
-    predictor.eval()
-
-    for box_idx in tqdm(range(NUM_TARGET_BOXES_PER_IMAGE)):
-        seed = box_idx
-        torch_generator.manual_seed(seed)
-
-        target_block_h, target_block_w = mask_collator._sample_block_size(
-            generator=torch_generator,
-            scale=config.target_block_scale,
-            aspect_ratio_scale=config.target_block_aspect_ratio)
+        inverse_image_transform, eval_loader = load_evaluation_dataset(config)
         
-        for _, (image, _, label, image_name, borders_dict) in enumerate(eval_loader):
-            image = image.to(device)
-            label = label.to(device)
-            image_name = image_name[0].split('.')[0]
+        print("Number of evaluation samples: ", len(eval_loader))
 
-            if box_idx == 0:
-                image_per_patch_distances[image_name] = {patch_idx: [] for patch_idx in range(num_patches)}
+        # Used for sampling the size of a target block
+        mask_collator = MaskCollator(
+            input_size=(config.crop_size, config.crop_size),
+            patch_size=config.patch_size
+        )
+        torch_generator = torch.Generator()
 
-            list_masks_target_encoder, encoder_mask = get_target_encoder_and_encoder_masks(device, config, inverse_image_transform, seed, target_block_h, target_block_w, image, image_name)
-                
-            with torch.no_grad():
-                # --- Target encoder forward prop
-                # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
-                target_encoder_emb = target_encoder.forward(image)
-                # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
-                # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
-                # retrieve the batch size
-                B = len(target_encoder_emb)
-                
-                # Retrieve the embeddings only for the mask patches 
-                target_encoder_emb = apply_masks(target_encoder_emb, list_masks_target_encoder)
-                target_encoder_emb = repeat_interleave_batch(target_encoder_emb, B, repeat=1)
+        list_box_sizes = []
+        list_image_names = []
+        list_mean_distances_per_image = []
+        list_max_distances_per_image = []
+        list_labels = []
+        list_seeds = []
+        list_cropped_borders_dicts = []
 
-                # --- (Context) Encoder forward prop
-                encoder_emb = encoder.forward(image, encoder_mask)
+        # -- used for building the anomaly map
+        num_patches = (config.crop_size // config.patch_size) * (config.crop_size // config.patch_size)
+        image_per_patch_distances = {}
+        # --
+        
+        encoder.eval()
+        target_encoder.eval()
+        predictor.eval()
 
-                # --- Predictor forward prop
-                predictor_emb = predictor.forward(encoder_emb, encoder_mask, list_masks_target_encoder)
+        for box_idx in tqdm(range(NUM_TARGET_BOXES_PER_IMAGE)):
+            seed = box_idx
+            torch_generator.manual_seed(seed)
 
-                # --- Compute the metrics
-                # Average distance between the predicted and target patch-level representations (embeddings) for the random box
-                # Get distances per patch embedding for building an anomaly map
-                if DISTANCE == "l2":
-                    distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
-                elif DISTANCE == "l1":
-                    distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=1, dim=2)
-                else:
-                    print("Distance metric is not correct! Set DISTANCE to one of the following options: l1, l2")
-                    return        
+            target_block_h, target_block_w = mask_collator._sample_block_size(
+                generator=torch_generator,
+                scale=config.target_block_scale,
+                aspect_ratio_scale=config.target_block_aspect_ratio)
+            
+            for _, (image, label, image_name, borders_dict) in enumerate(eval_loader):
+                image = image.to(device)
+                label = label.detach().item()
+                image_name = image_name[0].split('.')[0]
 
-                mean_distance_per_image = torch.mean(input=distance_per_patch, dim=1, keepdim=False)
-                list_mean_distances_per_image.append(mean_distance_per_image.detach().item())
+                if box_idx == 0:
+                    image_per_patch_distances[image_name] = {patch_idx: [] for patch_idx in range(num_patches)}
 
-                max_distance_per_image = torch.max(input=distance_per_patch, dim=1, keepdim=False)
-                list_max_distances_per_image.append(max_distance_per_image.values.detach().item())
+                list_masks_target_encoder, encoder_mask = get_target_encoder_and_encoder_masks(device, config, inverse_image_transform, seed, target_block_h, target_block_w, image, image_name)
+                    
+                with torch.no_grad():
+                    # --- Target encoder forward prop
+                    # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
+                    target_encoder_emb = target_encoder(image)
+                    # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
+                    # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                    # retrieve the batch size
+                    B = len(target_encoder_emb)
+                    
+                    # Retrieve the embeddings only for the mask patches 
+                    target_encoder_emb = apply_masks(target_encoder_emb, list_masks_target_encoder)
+                    target_encoder_emb = repeat_interleave_batch(target_encoder_emb, B, repeat=1)
 
-                list_image_names.append(image_name)
-                list_box_sizes.append((target_block_h * config.patch_size, target_block_w * config.patch_size))
-                list_labels.append(label.detach().item())
-                list_seeds.append(seed)
-                list_cropped_borders_dicts.append(borders_dict)
+                    # --- (Context) Encoder forward prop
+                    encoder_emb = encoder(image, encoder_mask)
 
-                mask = torch.squeeze(list_masks_target_encoder[0])
-                indices_mask_target = mask.tolist()
-                for idx_tensor, index_patch in enumerate(indices_mask_target):
-                    image_per_patch_distances[image_name][index_patch] += [distance_per_patch[0, idx_tensor].item()]
+                    # --- Predictor forward prop
+                    predictor_emb = predictor(encoder_emb, encoder_mask, list_masks_target_encoder)
 
-        log_distances_stats(list_mean_distances_per_image, list_max_distances_per_image, list_labels, seed)
-    
-    save_results(list_image_names, list_labels, list_cropped_borders_dicts, image_per_patch_distances, 
-                 list_mean_distances_per_image, list_max_distances_per_image, list_box_sizes, list_seeds)
+                    # --- Compute the metrics
+                    # Average distance between the predicted and target patch-level representations (embeddings) for the random box
+                    # Get distances per patch embedding for building an anomaly map
+                    if DISTANCE == "l2":
+                        distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
+                    elif DISTANCE == "l1":
+                        distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=1, dim=2)
+                    else:
+                        print("Distance metric is not correct! Set DISTANCE to one of the following options: l1, l2")
+                        return        
+
+                    mean_distance_per_image = torch.mean(input=distance_per_patch, dim=1, keepdim=False)
+                    list_mean_distances_per_image.append(mean_distance_per_image.detach().item())
+
+                    max_distance_per_image = torch.max(input=distance_per_patch, dim=1, keepdim=False)
+                    list_max_distances_per_image.append(max_distance_per_image.values.detach().item())
+
+                    list_image_names.append(image_name)
+                    list_box_sizes.append((target_block_h * config.patch_size, target_block_w * config.patch_size))
+                    list_labels.append(label)
+                    list_seeds.append(seed)
+                    list_cropped_borders_dicts.append(borders_dict)
+
+                    mask = torch.squeeze(list_masks_target_encoder[0])
+                    indices_mask_target = mask.tolist()
+                    for idx_tensor, index_patch in enumerate(indices_mask_target):
+                        image_per_patch_distances[image_name][index_patch] += [distance_per_patch[0, idx_tensor].item()]
+
+            log_distances_stats(list_mean_distances_per_image, list_max_distances_per_image, list_labels, seed)
+        
+        save_results(list_image_names, list_labels, list_cropped_borders_dicts, image_per_patch_distances, 
+                    list_mean_distances_per_image, list_max_distances_per_image, list_box_sizes, list_seeds)
+        
 
 def save_results(list_image_names, list_labels, list_cropped_borders_dicts, image_per_patch_distances, list_mean_distances_per_image, list_max_distances_per_image, list_box_sizes, list_seeds):
     df = pd.DataFrame({
@@ -390,10 +392,6 @@ def load_evaluation_dataset(config):
         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     ])
 
-    mask_transform = transforms.Compose([
-        transforms.ToTensor()
-    ])
-
     inverse_image_transform = transforms.Compose([
         transforms.Normalize(mean = [ 0.0, 0.0, 0.0],
                              std = [ 1.0 / 0.229, 1.0 / 0.224, 1.0 / 0.225],
@@ -403,19 +401,18 @@ def load_evaluation_dataset(config):
                              inplace=False)
         ])
     
-    eval_dataset = SegmentationWithLabelDataset(
+    eval_dataset = LabelDataset(
         images_dir=EVALUATION_DATASET_PATH,
         dataset_name=DATASET_NAME,
         count_border_pixels=config.count_border_pixels,
-        transform=image_transform,
-        mask_transform=mask_transform)
+        transform=image_transform)
 
     eval_loader = torch.utils.data.DataLoader(
         dataset=eval_dataset,
         batch_size=1,
         shuffle=False)
         
-    return inverse_image_transform,eval_loader
+    return inverse_image_transform, eval_loader
 
 
 if __name__ == "__main__":
