@@ -36,6 +36,8 @@ from src.utils.distributed import (
     init_distributed,
     AllReduce
 )
+from src.utils.configs import *
+
 from src.utils.logging import (
     CSVLogger,
     gpu_timer,
@@ -45,6 +47,7 @@ from src.utils.tensors import repeat_interleave_batch
 from src.datasets.brain_mri import make_brain_mri
 from src.datasets.liver_ct import make_liver_ct
 from src.datasets.resc import make_resc
+
 
 from src.helper import (
     load_models_from_checkpoint,
@@ -69,7 +72,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger()
 
 
-def main(args):
+def main(*args, **kwargs):
     # Setting the device
     if not torch.cuda.is_available():
         device = torch.device('cpu')
@@ -77,81 +80,15 @@ def main(args):
         device = torch.device('cuda:0')
         torch.cuda.set_device(device)
 
-    # ----------------------------------------------------------------------- #
-    #  PASSED IN PARAMS FROM CONFIG FILE
-    # ----------------------------------------------------------------------- #
+    # Read training config file
+    config = read_config(config_path=kwargs["config_path"])
 
-    # -- META
-    use_bfloat16 = args['meta']['use_bfloat16']
-    load_checkpoint_path = args['meta']['load_checkpoint_path']
-    checkpoint_type = args['meta']['checkpoint_type']
-    assert checkpoint_type in ['dinov3', 'ijepa'], "Checkpoint type should be: 'dinov3' or 'ijepa'"
-
-    # context encoder
-    encoder_model_name = args['meta']['encoder_model_name']
-    encoder_weights_source = args['meta']['encoder_weights_source']
-    encoder_embed_dim = args['meta']['encoder_embed_dim']
-
-    # predictor
-    predictor_model_name = args['meta']['predictor_model_name']
-    predictor_weights_source = args['meta']['predictor_weights_source']
-    predictor_depth = args['meta']['predictor_depth']
-    predictor_embed_dim = args['meta']['predictor_embed_dim']
-    predictor_num_heads = args['meta']['predictor_num_heads']
-
-    # target encoder
-    target_encoder_model_name = args['meta']['target_encoder_model_name']
-    target_encoder_weights_source = args['meta']['target_encoder_weights_source']
-
-
-    # -- DATA
-    # training specifics
-    batch_size = args['data']['batch_size']
-    crop_size = args['data']['crop_size']
-    crop_scale = args['data']['crop_scale']
-    count_border_pixels = args['data']['count_border_pixels']
-
-    image_folder = args['data']['image_folder']
-    data_root_folder_path = args['data']['data_root_folder_path']
-    pin_mem = args['data']['pin_mem']
-    num_workers = args['data']['num_workers']
-
-
-    # -- MASK
-    patch_size = args['mask']['patch_size']  # patch-size for model training
-    allow_overlap = args['mask']['allow_overlap']  # whether to allow overlap b/w context and target blocks
-    
-    enc_mask_scale = args['mask']['enc_mask_scale']  # scale of context blocks
-    enc_mask_aspect_ratio = args['mask']['enc_mask_aspect_ratio'] # aspect ratio of the context blocks
-    enc_min_keep = args['mask']['enc_min_keep']  # min number of patches in context block
-    num_enc_masks = args['mask']['num_enc_masks']  # number of context blocks
-    
-    pred_mask_scale = args['mask']['pred_mask_scale']  # scale of target blocks
-    pred_mask_aspect_ratio = args['mask']['pred_mask_aspect_ratio']  # aspect ratio of target blocks
-    num_pred_masks = args['mask']['num_pred_masks']  # number of target blocks
-    
-
-    # -- OPTIMIZATION
-    num_epochs = args['optimization']['num_epochs']
-    ema = args['optimization']['ema']
-    ipe_scale = args['optimization']['ipe_scale']  # scheduler scale factor (def: 1.0)
-
-    lr = args['optimization']['lr']
-    start_lr = args['optimization']['start_lr']
-    final_lr = args['optimization']['final_lr']
-    warmup = args['optimization']['warmup']
-
-    wd = float(args['optimization']['weight_decay'])
-    final_wd = float(args['optimization']['final_weight_decay'])
-    
-    
-    # -- LOGGING
-    logging_folder = args['logging']['logging_folder']
-    tag = args['logging']['write_tag']
-
-    dump = os.path.join(logging_folder, 'config_run.yaml')
+    with open(kwargs["config_path"], "r") as f:
+        yaml_config = yaml.safe_load(f)
+    os.makedirs(config.logging_folder, exist_ok=False)
+    dump = os.path.join(config.logging_folder, 'config_run.yaml')
     with open(dump, 'w') as f:
-        yaml.dump(args, f)
+        yaml.dump(yaml_config, f)
     # ----------------------------------------------------------------------- #
 
     try:
@@ -166,16 +103,18 @@ def main(args):
         logger.setLevel(logging.ERROR)
 
     # -- log/checkpointing paths
-    log_file = os.path.join(logging_folder, f'{tag}_r{rank}.csv')
-    checkpoint_folder = logging_folder.replace("logs", "checkpoints")
-    save_path = os.path.join(checkpoint_folder, f'{tag}' + '-epoch{epoch}.pth.tar')
-    latest_path = os.path.join(checkpoint_folder, f'{tag}-latest.pth.tar')
-    if load_checkpoint_path:
-        load_path = Path(load_checkpoint_path)
+    log_file = os.path.join(config.logging_folder, f'{config.tag}_r{rank}.csv')
+    checkpoint_folder = config.logging_folder.replace("logs", "checkpoints")
+    os.makedirs(checkpoint_folder, exist_ok=False)
+
+    save_path = os.path.join(checkpoint_folder, f'{config.tag}' + '-epoch{epoch}.pth.tar')
+    latest_path = os.path.join(checkpoint_folder, f'{config.tag}-latest.pth.tar')
+    if config.load_checkpoint_path:
+        load_path = Path(config.load_checkpoint_path)
     else:
         load_path = None
 
-    dataset_name = image_folder.split("/")[0]
+    dataset_name = config.image_folder.split("/")[0]
 
     # -- make csv_logger
     csv_logger = CSVLogger(log_file,
@@ -187,93 +126,94 @@ def main(args):
                            ('%d', 'time (ms)'))
 
     # -- init model
-    if checkpoint_type == "dinov3":
+    if config.checkpoint_type == "dinov3":
         dict_init_models = init_model_dinov3(
             device=device,
-            encoder_model_name=encoder_model_name,
-            encoder_weights_path=encoder_weights_source,
-            predictor_depth=predictor_depth,
-            encoder_embed_dim=encoder_embed_dim,
-            predictor_embed_dim=predictor_embed_dim,
-            predictor_num_patches=(crop_size // patch_size) * (crop_size // patch_size),
-            predictor_num_heads=predictor_num_heads,
-            target_encoder_model_name = target_encoder_model_name,
-            target_encoder_weights_path = target_encoder_weights_source
+            encoder_model_name=config.encoder_model_name,
+            encoder_weights_path=config.encoder_weights_source,
+            predictor_depth=config.predictor_depth,
+            encoder_embed_dim=config.encoder_embed_dim,
+            predictor_embed_dim=config.predictor_embed_dim,
+            predictor_num_patches=(config.crop_size // config.patch_size) * (config.crop_size // config.patch_size),
+            predictor_num_heads=config.predictor_num_heads,
+            target_encoder_model_name = config.target_encoder_model_name,
+            target_encoder_weights_path = config.target_encoder_weights_source
         )
         encoder = dict_init_models["encoder"]
         predictor = dict_init_models["predictor"]
         target_encoder = dict_init_models["target_encoder"]
 
-    elif checkpoint_type == "ijepa":
+    elif config.checkpoint_type == "ijepa":
         encoder, predictor = init_model(
             device=device,
-            patch_size=patch_size,
-            crop_size=crop_size,
-            pred_depth=predictor_depth,
-            pred_emb_dim=predictor_embed_dim,
-            model_name=encoder_model_name)
+            patch_size=config.patch_size,
+            crop_size=config.crop_size,
+            pred_depth=config.predictor_depth,
+            pred_emb_dim=config.predictor_embed_dim,
+            model_name=config.encoder_model_name)
         target_encoder = copy.deepcopy(encoder)
 
     # -- make data transforms
     mask_collator = MBMaskCollator(
-        input_size=crop_size,
-        patch_size=patch_size,
-        pred_mask_scale=pred_mask_scale,
-        enc_mask_scale=enc_mask_scale,
-        aspect_ratio=pred_mask_aspect_ratio,
-        nenc=num_enc_masks,
-        npred=num_pred_masks,
-        allow_overlap=allow_overlap,
-        min_keep=enc_min_keep)
+        input_size=config.crop_size,
+        patch_size=config.patch_size,
+        pred_mask_scale=config.target_block_scale,
+        enc_mask_scale=config.enc_mask_scale,
+        aspect_ratio=config.target_block_aspect_ratio,
+        nenc=config.num_enc_masks,
+        npred=config.num_pred_masks,
+        allow_overlap=config.allow_overlap,
+        min_keep=config.enc_min_keep)
 
     transform = make_transforms(
-        crop_size=crop_size,
-        crop_scale=crop_scale,
+        crop_size=config.crop_size,
+        crop_scale=config.crop_scale,
+        normalization=(config.transform_mean, config.transform_std),
         dataset_name=dataset_name,
-        count_border_pixels=count_border_pixels
+        count_border_pixels=config.count_border_pixels
     )
 
     # -- init data-loaders/samplers
-    if "BraTS2021_slice" in image_folder:
+    if "BraTS2021_slice" in config.image_folder:
         # Brain MRI dataset
         _, unsupervised_loader, unsupervised_sampler = make_brain_mri(
                 transform=transform,
-                batch_size=batch_size,
+                batch_size=config.batch_size,
                 collator=mask_collator,
-                pin_mem=pin_mem,
-                num_workers=num_workers,
+                pin_mem=config.pin_mem,
+                num_workers=config.num_workers,
                 world_size=world_size,
                 rank=rank,
-                root_path=data_root_folder_path,
-                image_folder=image_folder,
+                root_path=config.data_root_folder_path,
+                image_folder=config.image_folder,
                 drop_last=True
         )
-    elif "hist_DIY" in image_folder:
+    elif "hist_DIY" in config.image_folder:
         # Liver CT dataset
         _, unsupervised_loader, unsupervised_sampler = make_liver_ct(
                 transform=transform,
-                batch_size=batch_size,
+                batch_size=config.batch_size,
                 collator=mask_collator,
-                pin_mem=pin_mem,
-                num_workers=num_workers,
+                pin_mem=config.pin_mem,
+                num_workers=config.num_workers,
                 world_size=world_size,
                 rank=rank,
-                root_path=data_root_folder_path,
-                image_folder=image_folder,
+                root_path=config.data_root_folder_path,
+                image_folder=config.image_folder,
                 drop_last=True
         )
-    elif "RESC" in image_folder:
+    elif "RESC" in config.image_folder:
         # RESC dataset
         _, unsupervised_loader, unsupervised_sampler = make_resc(
                 transform=transform,
-                batch_size=batch_size,
+                batch_size=config.batch_size,
                 collator=mask_collator,
-                pin_mem=pin_mem,
-                num_workers=num_workers,
+                pin_mem=config.pin_mem,
+                num_workers=config.num_workers,
                 world_size=world_size,
                 rank=rank,
-                root_path=data_root_folder_path,
-                image_folder=image_folder,
+                root_path=config.data_root_folder_path,
+                image_folder=config.image_folder,
                 drop_last=True
         )  
 
@@ -284,20 +224,20 @@ def main(args):
     optimizer, scaler, scheduler, wd_scheduler = init_opt(
         encoder=encoder,
         predictor=predictor,
-        wd=wd,
-        final_wd=final_wd,
-        start_lr=start_lr,
-        ref_lr=lr,
-        final_lr=final_lr,
+        wd=config.wd,
+        final_wd=config.final_wd,
+        start_lr=config.start_lr,
+        ref_lr=config.lr,
+        final_lr=config.final_lr,
         iterations_per_epoch=ipe,
-        warmup=warmup,
-        num_epochs=num_epochs,
-        ipe_scale=ipe_scale,
-        use_bfloat16=use_bfloat16)
+        warmup=config.warmup,
+        num_epochs=config.num_epochs,
+        ipe_scale=config.ipe_scale,
+        use_bfloat16=config.use_bfloat16)
 
     # -- momentum schedule
-    momentum_scheduler = (ema[0] + i * (ema[1] - ema[0]) / (ipe * num_epochs * ipe_scale)
-                          for i in range(int(ipe * num_epochs * ipe_scale) + 1))
+    momentum_scheduler = (config.ema[0] + i * (config.ema[1] - config.ema[0]) / (ipe * config.num_epochs * config.ipe_scale)
+                          for i in range(int(ipe * config.num_epochs * config.ipe_scale) + 1))
 
     start_epoch = 0
 
@@ -310,7 +250,7 @@ def main(args):
             target_encoder=target_encoder,
             optimizer=optimizer,
             scaler=scaler,
-            dinov3_ckpt=(checkpoint_type == "dinov3")
+            dinov3_ckpt=(config.checkpoint_type == "dinov3")
         )
         encoder = loaded_dict_from_checkpoint["encoder"]
         predictor = loaded_dict_from_checkpoint["predictor"]
@@ -340,17 +280,17 @@ def main(args):
             'scaler': None if scaler is None else scaler.state_dict(),
             'epoch': epoch,
             'loss': loss_meter.avg,
-            'batch_size': batch_size,
+            'batch_size': config.batch_size,
             'world_size': world_size,
-            'lr': lr
+            'lr': config.lr
         }
-        if checkpoint_type == "dinov3":
-            save_dict["encoder_model_name"] = encoder_model_name
-            save_dict["predictor_model_name"] = predictor_model_name
-            save_dict["target_encoder_model_name"] = target_encoder_model_name
-            save_dict["encoder_weights_source"] = encoder_weights_source
-            save_dict["predictor_weights_source"] = predictor_weights_source
-            save_dict["target_encoder_weights_source"] = target_encoder_weights_source
+        if config.checkpoint_type == "dinov3":
+            save_dict["encoder_model_name"] = config.encoder_model_name
+            save_dict["predictor_model_name"] = config.predictor_model_name
+            save_dict["target_encoder_model_name"] = config.target_encoder_model_name
+            save_dict["encoder_weights_source"] = config.encoder_weights_source
+            save_dict["predictor_weights_source"] = config.predictor_weights_source
+            save_dict["target_encoder_weights_source"] = config.target_encoder_weights_source
 
         if rank == 0:
             torch.save(save_dict, latest_path)
@@ -358,8 +298,8 @@ def main(args):
                 torch.save(save_dict, save_path.format(epoch=f'{epoch}'))
 
     # -- TRAINING LOOP
-    print(f"Started training for {num_epochs} epochs...")
-    for epoch in range(start_epoch, num_epochs):
+    print(f"Started training for {config.num_epochs} epochs...")
+    for epoch in range(start_epoch, config.num_epochs):
         logger.info('Epoch %d' % (epoch + 1))
 
         # -- update distributed-data-loader epoch
@@ -407,13 +347,13 @@ def main(args):
                     return loss
 
                 # Step 1. Forward
-                with torch.amp.autocast('cuda', dtype=torch.bfloat16, enabled=use_bfloat16):
+                with torch.amp.autocast('cuda', dtype=torch.bfloat16, enabled=config.use_bfloat16):
                     h = forward_target()
                     z = forward_context()
                     loss = loss_fn(z, h)
 
                 #  Step 2. Backward & step
-                if use_bfloat16:
+                if config.use_bfloat16:
                     scaler.scale(loss).backward()
                     scaler.step(optimizer)
                     scaler.update()

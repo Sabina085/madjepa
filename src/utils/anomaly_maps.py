@@ -61,6 +61,8 @@ def build_anomaly_map_with_borders(
         interpolation_method=interpolation_method
     )
 
+    # Maybe apply min-max scaling here
+
     assert resized_crop_anomaly_map.shape == (
         borders_dict["bottom"] - borders_dict["top"] + 1, 
         borders_dict["right"] - borders_dict["left"] + 1

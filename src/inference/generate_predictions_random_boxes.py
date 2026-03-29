@@ -1,5 +1,4 @@
 import torch
-import yaml
 import json
 import numpy as np
 import pandas as pd
@@ -11,6 +10,7 @@ from torchvision import transforms
 
 from src.utils.inference import *
 from src.utils.dataset import *
+from src.utils.configs import *
 from src.helper import (
     load_models_from_checkpoint,
     init_model_dinov3
@@ -23,10 +23,10 @@ subpath_list = os.getcwd().split(os.sep)
 root_directory_path = os.path.join(*subpath_list[:-1])
 current_dir = subpath_list[-1]
 
-###  To modify these configuration values
-DATASET_NAME = "BraTS2021_slice"
-EXPERIMENT_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training"
-SPLIT = "valid"
+###  To modify these configuration values before running the script
+DATASET_NAME = "BraTS2021_slice" # "RESC" 
+EXPERIMENT_NAME = "test_experiment" # "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training_very_low_wd" # 
+SPLIT = "test"
 # How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
 DISTANCE = "l2"
@@ -66,139 +66,75 @@ SAVE_CROPPED_BORDERS_DICT_FOLDER = (
     "cropped_borders_dicts/"
 )
 
-class Config():
-    encoder_model_name: str
-    encoder_weights_path: str
-    encoder_embed_dim: int
-
-    # --- target encoder
-    target_encoder_model_name: str
-    target_encoder_weights_path: str
-
-    # --- predictor
-    predictor_depth: int
-    predictor_num_heads: int
-    predictor_embed_dim: int
-
-    # --- data transforms
-    crop_size: int
-    patch_size: int
-    count_border_pixels: int
-
-    # -- target blocks / masks
-    target_block_scale: Tuple[float, float]
-    target_block_aspect_ratio: Tuple[float, float]
-
-    # --- context block / mask
-    enc_mask_scale: Tuple[float, float]
-    enc_mask_aspect_ratio: Tuple[float, float]
-    enc_min_keep: int
-
-def read_config(config_path: str) -> Config:
-    config = Config()
-    with open(config_path, "r") as f:
-        config_dict = yaml.safe_load(f)
-
-    # Read the configuration file (which was used for training the checkpoint)
-    # --- context encoder
-    config.encoder_model_name = config_dict["meta"]["encoder_model_name"]
-    config.encoder_weights_path = config_dict["meta"]["encoder_weights_source"]
-    config.encoder_embed_dim = config_dict["meta"]["encoder_embed_dim"]
-
-    # --- target encoder
-    config.target_encoder_model_name = config_dict["meta"]["target_encoder_model_name"]
-    config.target_encoder_weights_path = config_dict["meta"]["target_encoder_weights_source"]
-
-    # --- predictor
-    config.predictor_depth = config_dict["meta"]["predictor_depth"]
-    config.predictor_num_heads = config_dict["meta"]["predictor_num_heads"]
-    config.predictor_embed_dim = config_dict["meta"]["predictor_embed_dim"]
-
-    # --- data transforms
-    config.crop_size = config_dict["data"]["crop_size"]
-    config.patch_size = config_dict["mask"]["patch_size"]
-    config.count_border_pixels = config_dict["data"]["count_border_pixels"]
-
-    # -- target blocks / masks
-    config.target_block_scale = config_dict["mask"]["pred_mask_scale"]
-    config.target_block_aspect_ratio = config_dict["mask"]["pred_mask_aspect_ratio"]
-
-    # --- context block / mask
-    config.enc_mask_scale = config_dict["mask"]["enc_mask_scale"]
-    config.enc_mask_aspect_ratio = config_dict["mask"]["enc_mask_aspect_ratio"]
-    config.enc_min_keep = config_dict["mask"]["enc_min_keep"]
-
-    return config
-
-
 def main():
     # Set up the device
     if not torch.cuda.is_available():
-        device = torch.device('cpu')
+        device = torch.device("cpu")
     else:
-        device = torch.device('cuda:0')
+        device = torch.device("cuda:0")
         torch.cuda.set_device(device)
 
+    # Read the configuration file (which was used for training the checkpoint)
     config = read_config(config_path=CONFIG_PATH)
 
+    # Init DinoV3/I-Jepa models: (context) encoder (DinoV3) + predictor (I-Jepa checkpoint) + target_encoder (DinoV3 - same architecture as the context encoder)
+    dict_models = init_model_dinov3(
+        device=device,
+        encoder_model_name=config.encoder_model_name,
+        encoder_weights_path=config.encoder_weights_source,
+        predictor_depth=config.predictor_depth,
+        encoder_embed_dim=config.encoder_embed_dim,
+        predictor_embed_dim=config.predictor_embed_dim,
+        predictor_num_patches=(config.crop_size // config.patch_size) * (config.crop_size // config.patch_size),
+        predictor_num_heads=config.predictor_num_heads,
+        target_encoder_model_name=config.target_encoder_model_name,
+        target_encoder_weights_path=config.target_encoder_weights_source
+    )
+
+    # Load the pre-trained checkpoint (encoder + target encoder - DinoV3 VitS, predictor - IJepa checkpoint)
+    print(f"Loading checkpoint from: {CKPT_FILE_PATH}")
+    checkpoint_models = load_models_from_checkpoint(
+        checkpoint_path=CKPT_FILE_PATH,
+        encoder=dict_models["encoder"],
+        predictor=dict_models["predictor"],
+        target_encoder=dict_models["target_encoder"],
+        optimizer=None,
+        scaler=None,
+        dinov3_ckpt=True
+    )
+    encoder = checkpoint_models["encoder"]
+    predictor = checkpoint_models["predictor"]
+    target_encoder = checkpoint_models["target_encoder"]
+
+    inverse_image_transform, eval_loader = load_evaluation_dataset(config)
+    
+    print("Number of evaluation samples: ", len(eval_loader))
+
+    # Used for sampling the size of a target block
+    mask_collator = MaskCollator(
+        input_size=(config.crop_size, config.crop_size),
+        patch_size=config.patch_size
+    )
+    torch_generator = torch.Generator()
+
+    list_box_sizes = []
+    list_image_names = []
+    list_mean_distances_per_image = []
+    list_max_distances_per_image = []
+    list_labels = []
+    list_seeds = []
+    list_cropped_borders_dicts = []
+
+    # -- used for building the anomaly map
+    num_patches = (config.crop_size // config.patch_size) * (config.crop_size // config.patch_size)
+    image_per_patch_distances = {}
+    # --
+    
+    encoder.eval()
+    target_encoder.eval()
+    predictor.eval()
+
     with torch.inference_mode():
-        # Init DinoV3/I-Jepa models: (context) encoder (DinoV3) + predictor (I-Jepa checkpoint) + target_encoder (DinoV3 - same architecture as the context encoder)
-        dict_models = init_model_dinov3(
-            device=device,
-            encoder_model_name=config.encoder_model_name,
-            encoder_weights_path=config.encoder_weights_path,
-            predictor_depth=config.predictor_depth,
-            encoder_embed_dim=config.encoder_embed_dim,
-            predictor_embed_dim=config.predictor_embed_dim,
-            predictor_num_patches=(config.crop_size // config.patch_size) * (config.crop_size // config.patch_size),
-            predictor_num_heads=config.predictor_num_heads,
-            target_encoder_model_name=config.target_encoder_model_name,
-            target_encoder_weights_path=config.target_encoder_weights_path
-        )
-
-        # Load the pre-trained checkpoint (encoder + target encoder - DinoV3 VitS, predictor - IJepa checkpoint)
-        print(f"Loading checkpoint from: {CKPT_FILE_PATH}")
-        checkpoint_models = load_models_from_checkpoint(
-            checkpoint_path=CKPT_FILE_PATH,
-            encoder=dict_models["encoder"],
-            predictor=dict_models["predictor"],
-            target_encoder=dict_models["target_encoder"],
-            optimizer=None,
-            scaler=None,
-            dinov3_ckpt=True
-        )
-        encoder = checkpoint_models["encoder"]
-        predictor = checkpoint_models["predictor"]
-        target_encoder = checkpoint_models["target_encoder"]
-
-        inverse_image_transform, eval_loader = load_evaluation_dataset(config)
-        
-        print("Number of evaluation samples: ", len(eval_loader))
-
-        # Used for sampling the size of a target block
-        mask_collator = MaskCollator(
-            input_size=(config.crop_size, config.crop_size),
-            patch_size=config.patch_size
-        )
-        torch_generator = torch.Generator()
-
-        list_box_sizes = []
-        list_image_names = []
-        list_mean_distances_per_image = []
-        list_max_distances_per_image = []
-        list_labels = []
-        list_seeds = []
-        list_cropped_borders_dicts = []
-
-        # -- used for building the anomaly map
-        num_patches = (config.crop_size // config.patch_size) * (config.crop_size // config.patch_size)
-        image_per_patch_distances = {}
-        # --
-        
-        encoder.eval()
-        target_encoder.eval()
-        predictor.eval()
-
         for box_idx in tqdm(range(NUM_TARGET_BOXES_PER_IMAGE)):
             seed = box_idx
             torch_generator.manual_seed(seed)
@@ -218,52 +154,51 @@ def main():
 
                 list_masks_target_encoder, encoder_mask = get_target_encoder_and_encoder_masks(device, config, inverse_image_transform, seed, target_block_h, target_block_w, image, image_name)
                     
-                with torch.no_grad():
-                    # --- Target encoder forward prop
-                    # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
-                    target_encoder_emb = target_encoder(image)
-                    # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
-                    # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
-                    # retrieve the batch size
-                    B = len(target_encoder_emb)
-                    
-                    # Retrieve the embeddings only for the mask patches 
-                    target_encoder_emb = apply_masks(target_encoder_emb, list_masks_target_encoder)
-                    target_encoder_emb = repeat_interleave_batch(target_encoder_emb, B, repeat=1)
+                # --- Target encoder forward prop
+                # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
+                target_encoder_emb = target_encoder(image)
+                # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
+                # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                # retrieve the batch size
+                B = len(target_encoder_emb)
+                
+                # Retrieve the embeddings only for the mask patches 
+                target_encoder_emb = apply_masks(target_encoder_emb, list_masks_target_encoder)
+                target_encoder_emb = repeat_interleave_batch(target_encoder_emb, B, repeat=1)
 
-                    # --- (Context) Encoder forward prop
-                    encoder_emb = encoder(image, encoder_mask)
+                # --- (Context) Encoder forward prop
+                encoder_emb = encoder(image, encoder_mask)
 
-                    # --- Predictor forward prop
-                    predictor_emb = predictor(encoder_emb, encoder_mask, list_masks_target_encoder)
+                # --- Predictor forward prop
+                predictor_emb = predictor(encoder_emb, encoder_mask, list_masks_target_encoder)
 
-                    # --- Compute the metrics
-                    # Average distance between the predicted and target patch-level representations (embeddings) for the random box
-                    # Get distances per patch embedding for building an anomaly map
-                    if DISTANCE == "l2":
-                        distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
-                    elif DISTANCE == "l1":
-                        distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=1, dim=2)
-                    else:
-                        print("Distance metric is not correct! Set DISTANCE to one of the following options: l1, l2")
-                        return        
+                # --- Compute the metrics
+                # Average distance between the predicted and target patch-level representations (embeddings) for the random box
+                # Get distances per patch embedding for building an anomaly map
+                if DISTANCE == "l2":
+                    distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
+                elif DISTANCE == "l1":
+                    distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=1, dim=2)
+                else:
+                    print("Distance metric is not correct! Set DISTANCE to one of the following options: l1, l2")
+                    return        
 
-                    mean_distance_per_image = torch.mean(input=distance_per_patch, dim=1, keepdim=False)
-                    list_mean_distances_per_image.append(mean_distance_per_image.detach().item())
+                mean_distance_per_image = torch.mean(input=distance_per_patch, dim=1, keepdim=False)
+                list_mean_distances_per_image.append(mean_distance_per_image.detach().item())
 
-                    max_distance_per_image = torch.max(input=distance_per_patch, dim=1, keepdim=False)
-                    list_max_distances_per_image.append(max_distance_per_image.values.detach().item())
+                max_distance_per_image = torch.max(input=distance_per_patch, dim=1, keepdim=False)
+                list_max_distances_per_image.append(max_distance_per_image.values.detach().item())
 
-                    list_image_names.append(image_name)
-                    list_box_sizes.append((target_block_h * config.patch_size, target_block_w * config.patch_size))
-                    list_labels.append(label)
-                    list_seeds.append(seed)
-                    list_cropped_borders_dicts.append(borders_dict)
+                list_image_names.append(image_name)
+                list_box_sizes.append((target_block_h * config.patch_size, target_block_w * config.patch_size))
+                list_labels.append(label)
+                list_seeds.append(seed)
+                list_cropped_borders_dicts.append(borders_dict)
 
-                    mask = torch.squeeze(list_masks_target_encoder[0])
-                    indices_mask_target = mask.tolist()
-                    for idx_tensor, index_patch in enumerate(indices_mask_target):
-                        image_per_patch_distances[image_name][index_patch] += [distance_per_patch[0, idx_tensor].item()]
+                mask = torch.squeeze(list_masks_target_encoder[0])
+                indices_mask_target = mask.tolist()
+                for idx_tensor, index_patch in enumerate(indices_mask_target):
+                    image_per_patch_distances[image_name][index_patch] += [distance_per_patch[0, idx_tensor].item()]
 
             log_distances_stats(list_mean_distances_per_image, list_max_distances_per_image, list_labels, seed)
         
@@ -350,6 +285,7 @@ def get_target_encoder_and_encoder_masks(device, config, inverse_image_transform
     return list_masks_target_encoder,encoder_mask
 
 def save_example_of_image_with_mask(config, inverse_image_transform, image, image_name, dict_mask_target_encoder, encoder_mask):
+    ### Optional function used for saving the sampled input boxes and the original images (not essential, can be removed)
     encoder_context_mask_arr = transform_from_mask_to_box(
                     image_height=config.crop_size,
                     image_width=config.crop_size,
@@ -359,18 +295,20 @@ def save_example_of_image_with_mask(config, inverse_image_transform, image, imag
                 
     if not os.path.exists(RANDOM_BOXES_PATH):
         os.makedirs(RANDOM_BOXES_PATH, exist_ok=True)
-
-                ### Code used for saving the generated input boxes (not essential, can be removed)
-                # Saving the original input image (unmasked)
+                
+    # Saving the original input image (unmasked)
+    # Image before applying normalization
     image_arr = inverse_image_transform(image[0, :, :, :]).detach().cpu().numpy()
     Image.fromarray((255 * np.transpose(image_arr, (1, 2, 0)))\
                     .astype("uint8")).convert("RGB")\
                     .save(f"{RANDOM_BOXES_PATH}/{image_name}_image.png")
+    
+    # Image after applying normalization
     Image.fromarray((255 * np.transpose(image[0, :, :, :].detach().cpu().numpy(), (1, 2, 0)))\
                     .astype("uint8")).convert("RGB")\
                     .save(f"{RANDOM_BOXES_PATH}/{image_name}_normalized_image.png")
     
-                # Saving the input image masked using the sampled random box (only the pixels inside the random box are visible)
+    # Saving the input image masked using the sampled random box (only the pixels inside the random box are visible)
     pixels_random_mask = np.repeat(np.expand_dims(dict_mask_target_encoder["pixels_random_mask"], axis=0), 3, axis=0)\
                     .astype("uint8")
     masked_image = np.transpose((255 * image_arr * pixels_random_mask)\
@@ -378,7 +316,7 @@ def save_example_of_image_with_mask(config, inverse_image_transform, image, imag
     Image.fromarray(masked_image).convert("RGB")\
                     .save(f"{RANDOM_BOXES_PATH}/{image_name}_random_pixels_mask_image.png")
 
-                # Save the image with the encoder masked context
+    # Save the image with the encoder masked context
     encoder_context_mask = np.repeat(np.expand_dims(encoder_context_mask_arr, axis=0), 3, axis=0).astype("uint8")
     masked_image = np.transpose((255 * image_arr * encoder_context_mask)\
                     .astype(np.uint8), (1, 2, 0))
@@ -389,14 +327,19 @@ def load_evaluation_dataset(config):
     image_transform = transforms.Compose([
         transforms.Resize((config.crop_size, config.crop_size), Image.BICUBIC),
         transforms.ToTensor(),
-        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        transforms.Normalize(mean=config.transform_mean, std=config.transform_std),
     ])
 
     inverse_image_transform = transforms.Compose([
         transforms.Normalize(mean = [ 0.0, 0.0, 0.0],
-                             std = [ 1.0 / 0.229, 1.0 / 0.224, 1.0 / 0.225],
+                             std = [ 1.0 / config.transform_std[0],
+                                     1.0 / config.transform_std[1], 
+                                     1.0 / config.transform_std[2]],
                              inplace=False),
-        transforms.Normalize(mean = [ -0.485, -0.456, -0.406],
+
+        transforms.Normalize(mean = [ -config.transform_mean[0],
+                                      -config.transform_mean[1],
+                                      -config.transform_mean[2]],
                              std = [ 1.0, 1.0, 1.0],
                              inplace=False)
         ])
@@ -411,6 +354,8 @@ def load_evaluation_dataset(config):
         dataset=eval_dataset,
         batch_size=1,
         shuffle=False)
+    
+    assert eval_loader.batch_size == 1, "Error: for generating random boxes, please use only batch size = 1! "
         
     return inverse_image_transform, eval_loader
 

@@ -17,16 +17,30 @@ meta:
   target_encoder_weights_source : pretrained_checkpoints/dinov3_checkpoints/dinov3_vits16_pretrain_lvd1689m-08c60483.pth # should be the same as for the context encoder
 
 data:
- # training specifics
+  # training specifics
   batch_size: 32
   crop_size: 224
   crop_scale:
   - 0.8
   - 1.0
-  # the border of background pixels left in the input image after ROI cropping
-  count_border_pixels: 10
 
-  image_folder: RESC/train/
+  # image normalization statistics
+  # ImageNet statistics
+  image_transform_statistics:
+  # ImageNet statistics
+    mean:
+    - 0.485
+    - 0.456
+    - 0.406
+    std:
+    - 0.229
+    - 0.224
+    - 0.225
+
+  # the border of background pixels left in the input image after ROI cropping
+  count_border_pixels: 2
+  
+  image_folder: BraTS2021_slice/train/
   data_root_folder_path: /media/vhondru/hdd/istoian/BMAD/dataset
   pin_mem: True
   num_workers: 10
@@ -69,10 +83,10 @@ optimization:
   final_lr: 1.0e-06
   warmup: 3
 
-  weight_decay: 0.001
-  final_weight_decay: 0.01
+  weight_decay: 0.04
+  final_weight_decay: 0.4
 
 
 logging:
-  logging_folder: experiments_RESC/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training_low_wd/logs/
-  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training_low_wd
+  logging_folder: experiments_BraTS2021_slice/test_experiment/logs/
+  write_tag: test_experiment

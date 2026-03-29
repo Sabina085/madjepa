@@ -6,19 +6,17 @@
 #
 
 import argparse
+import os
+import logging
 
 import multiprocessing as mp
-
-import pprint
-import yaml
-
 from src.utils.distributed import init_distributed
 from src.train import main as app_main
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
     '--fname', type=str,
-    help='name of config file to load',
+    help='path to the config file to load',
     default='configs.yaml')
 parser.add_argument(
     '--devices', type=str, nargs='+', default=['cuda:0'],
@@ -26,11 +24,9 @@ parser.add_argument(
 
 
 def process_main(rank, fname, world_size, devices):
-    import os
     os.environ['CUDA_VISIBLE_DEVICES'] = str(devices[rank].split(':')[-1])
-
-    import logging
     logging.basicConfig()
+
     logger = logging.getLogger()
     if rank == 0:
         logger.setLevel(logging.INFO)
@@ -39,17 +35,9 @@ def process_main(rank, fname, world_size, devices):
 
     logger.info(f'called-params {fname}')
 
-    # -- load script params
-    params = None
-    with open(fname, 'r') as y_file:
-        params = yaml.load(y_file, Loader=yaml.FullLoader)
-        logger.info('loaded params...')
-        pp = pprint.PrettyPrinter(indent=4)
-        pp.pprint(params)
-
     world_size, rank = init_distributed(rank_and_world_size=(rank, world_size))
     logger.info(f'Running... (rank: {rank}/{world_size})')
-    app_main(args=params)
+    app_main(config_path=fname)
 
 
 if __name__ == '__main__':
