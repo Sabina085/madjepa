@@ -153,52 +153,52 @@ def main():
                     image_per_patch_distances[image_name] = {patch_idx: [] for patch_idx in range(num_patches)}
 
                 list_masks_target_encoder, encoder_mask = get_target_encoder_and_encoder_masks(device, config, inverse_image_transform, seed, target_block_h, target_block_w, image, image_name)
+                with torch.no_grad():      
+                    # --- Target encoder forward prop
+                    # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
+                    target_encoder_emb = target_encoder(image)
+                    # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
+                    # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                    # retrieve the batch size
+                    B = len(target_encoder_emb)
                     
-                # --- Target encoder forward prop
-                # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
-                target_encoder_emb = target_encoder(image)
-                # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
-                # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
-                # retrieve the batch size
-                B = len(target_encoder_emb)
-                
-                # Retrieve the embeddings only for the mask patches 
-                target_encoder_emb = apply_masks(target_encoder_emb, list_masks_target_encoder)
-                target_encoder_emb = repeat_interleave_batch(target_encoder_emb, B, repeat=1)
+                    # Retrieve the embeddings only for the mask patches 
+                    target_encoder_emb = apply_masks(target_encoder_emb, list_masks_target_encoder)
+                    target_encoder_emb = repeat_interleave_batch(target_encoder_emb, B, repeat=1)
 
-                # --- (Context) Encoder forward prop
-                encoder_emb = encoder(image, encoder_mask)
+                    # --- (Context) Encoder forward prop
+                    encoder_emb = encoder(image, encoder_mask)
 
-                # --- Predictor forward prop
-                predictor_emb = predictor(encoder_emb, encoder_mask, list_masks_target_encoder)
+                    # --- Predictor forward prop
+                    predictor_emb = predictor(encoder_emb, encoder_mask, list_masks_target_encoder)
 
-                # --- Compute the metrics
-                # Average distance between the predicted and target patch-level representations (embeddings) for the random box
-                # Get distances per patch embedding for building an anomaly map
-                if DISTANCE == "l2":
-                    distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
-                elif DISTANCE == "l1":
-                    distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=1, dim=2)
-                else:
-                    print("Distance metric is not correct! Set DISTANCE to one of the following options: l1, l2")
-                    return        
+                    # --- Compute the metrics
+                    # Average distance between the predicted and target patch-level representations (embeddings) for the random box
+                    # Get distances per patch embedding for building an anomaly map
+                    if DISTANCE == "l2":
+                        distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=2, dim=2)
+                    elif DISTANCE == "l1":
+                        distance_per_patch = torch.linalg.vector_norm(predictor_emb - target_encoder_emb, ord=1, dim=2)
+                    else:
+                        print("Distance metric is not correct! Set DISTANCE to one of the following options: l1, l2")
+                        return        
 
-                mean_distance_per_image = torch.mean(input=distance_per_patch, dim=1, keepdim=False)
-                list_mean_distances_per_image.append(mean_distance_per_image.detach().item())
+                    mean_distance_per_image = torch.mean(input=distance_per_patch, dim=1, keepdim=False)
+                    list_mean_distances_per_image.append(mean_distance_per_image.detach().item())
 
-                max_distance_per_image = torch.max(input=distance_per_patch, dim=1, keepdim=False)
-                list_max_distances_per_image.append(max_distance_per_image.values.detach().item())
+                    max_distance_per_image = torch.max(input=distance_per_patch, dim=1, keepdim=False)
+                    list_max_distances_per_image.append(max_distance_per_image.values.detach().item())
 
-                list_image_names.append(image_name)
-                list_box_sizes.append((target_block_h * config.patch_size, target_block_w * config.patch_size))
-                list_labels.append(label)
-                list_seeds.append(seed)
-                list_cropped_borders_dicts.append(borders_dict)
+                    list_image_names.append(image_name)
+                    list_box_sizes.append((target_block_h * config.patch_size, target_block_w * config.patch_size))
+                    list_labels.append(label)
+                    list_seeds.append(seed)
+                    list_cropped_borders_dicts.append(borders_dict)
 
-                mask = torch.squeeze(list_masks_target_encoder[0])
-                indices_mask_target = mask.tolist()
-                for idx_tensor, index_patch in enumerate(indices_mask_target):
-                    image_per_patch_distances[image_name][index_patch] += [distance_per_patch[0, idx_tensor].item()]
+                    mask = torch.squeeze(list_masks_target_encoder[0])
+                    indices_mask_target = mask.tolist()
+                    for idx_tensor, index_patch in enumerate(indices_mask_target):
+                        image_per_patch_distances[image_name][index_patch] += [distance_per_patch[0, idx_tensor].item()]
 
             log_distances_stats(list_mean_distances_per_image, list_max_distances_per_image, list_labels, seed)
         

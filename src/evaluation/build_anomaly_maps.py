@@ -20,7 +20,7 @@ DATASET_NAME = "BraTS2021_slice"
 SPLIT = "valid"
 # How many random target boxes to sample per image
 NUM_TARGET_BOXES_PER_IMAGE = 30
-AGGREGATE_PATCHES_STRATEGY = "max"
+AGGREGATE_PATCHES_STRATEGY = "mean"
 GAUSSIAN_FILTER_BLUR_SIGMA = 4
 DISTANCE = "l2"
 EXPERIMENT_FOLDER_NAME = "test_experiment"
@@ -166,7 +166,7 @@ def save_results(image_name, label, scaled_anomaly_map):
     # We are saving in the same folder the ground-truth segmentation mask for comparing it with the generated anomaly map
     
     source_segmentation_mask_path = os.path.join(EVALUATION_DATASET_PATH, label_subpath, "label", image_name + ".png")
-    segmentation_image = Image.open(source_segmentation_mask_path)
+    segmentation_image = Image.open(source_segmentation_mask_path).convert("L")
     segmentation_arr = np.array(segmentation_image)
 
     # Preprocessing the segmentation masks: from BMAD codebase: https://github.com/DorisBao/BMAD/blob/main/UTRAD/data.py#L130 !!!
@@ -174,14 +174,14 @@ def save_results(image_name, label, scaled_anomaly_map):
     segmentation_arr[segmentation_arr < 0.1] = 0
  
     # Saving the image for visualization
-    dest_segmentation_mask_path = f"{ANOMALY_MAPS_IMAGES_PATH}/{image_name}_segmentation_label_{label}.png"
+    dest_segmentation_mask_path = f"{ANOMALY_MAPS_IMAGES_PATH}/{image_name}_segmentation_mask_label_{label}.png"
     Image.fromarray((255 * segmentation_arr) \
         .astype("uint8")) \
         .convert("L") \
         .save(dest_segmentation_mask_path)
 
     # Saving the segmentation map as a numpy array for computing the pixel-level metrics
-    dest_segmentation_arr_path = f"{ANOMALY_MAPS_ARRAYS_PATH}/{image_name}_segmentation_label_{label}.npy"
+    dest_segmentation_arr_path = f"{ANOMALY_MAPS_ARRAYS_PATH}/{image_name}_segmentation_mask_label_{label}.npy"
     np.save(file=dest_segmentation_arr_path, arr=segmentation_arr)
 
 if __name__ == "__main__":

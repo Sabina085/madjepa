@@ -20,7 +20,7 @@ DISTANCE = "l2"
 PER_IMAGE_STATISTIC = "max"
 ###
 
-EXPERIMENT_FOLDER_NAME = "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training"
+EXPERIMENT_FOLDER_NAME = "test_experiment"
 
 EXPERIMENT_FOLDER_PATH = (
     f"/{root_directory_path}/{current_dir}/"
