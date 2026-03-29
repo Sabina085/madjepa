@@ -77,64 +77,64 @@ def main():
     # Read the configuration file (which was used for training the checkpoint)
     config = read_config(config_path=CONFIG_PATH)
 
-    # Init DinoV3/I-Jepa models: (context) encoder (DinoV3) + predictor (I-Jepa checkpoint) + target_encoder (DinoV3 - same architecture as the context encoder)
-    dict_models = init_model_dinov3(
-        device=device,
-        encoder_model_name=config.encoder_model_name,
-        encoder_weights_path=config.encoder_weights_source,
-        predictor_depth=config.predictor_depth,
-        encoder_embed_dim=config.encoder_embed_dim,
-        predictor_embed_dim=config.predictor_embed_dim,
-        predictor_num_patches=(config.crop_size // config.patch_size) * (config.crop_size // config.patch_size),
-        predictor_num_heads=config.predictor_num_heads,
-        target_encoder_model_name=config.target_encoder_model_name,
-        target_encoder_weights_path=config.target_encoder_weights_source
-    )
-
-    # Load the pre-trained checkpoint (encoder + target encoder - DinoV3 VitS, predictor - IJepa checkpoint)
-    print(f"Loading checkpoint from: {CKPT_FILE_PATH}")
-    checkpoint_models = load_models_from_checkpoint(
-        checkpoint_path=CKPT_FILE_PATH,
-        encoder=dict_models["encoder"],
-        predictor=dict_models["predictor"],
-        target_encoder=dict_models["target_encoder"],
-        optimizer=None,
-        scaler=None,
-        dinov3_ckpt=True
-    )
-    encoder = checkpoint_models["encoder"]
-    predictor = checkpoint_models["predictor"]
-    target_encoder = checkpoint_models["target_encoder"]
-
-    inverse_image_transform, eval_loader = load_evaluation_dataset(config)
-    
-    print("Number of evaluation samples: ", len(eval_loader))
-
-    # Used for sampling the size of a target block
-    mask_collator = MaskCollator(
-        input_size=(config.crop_size, config.crop_size),
-        patch_size=config.patch_size
-    )
-    torch_generator = torch.Generator()
-
-    list_box_sizes = []
-    list_image_names = []
-    list_mean_distances_per_image = []
-    list_max_distances_per_image = []
-    list_labels = []
-    list_seeds = []
-    list_cropped_borders_dicts = []
-
-    # -- used for building the anomaly map
-    num_patches = (config.crop_size // config.patch_size) * (config.crop_size // config.patch_size)
-    image_per_patch_distances = {}
-    # --
-    
-    encoder.eval()
-    target_encoder.eval()
-    predictor.eval()
-
     with torch.inference_mode():
+        # Init DinoV3/I-Jepa models: (context) encoder (DinoV3) + predictor (I-Jepa checkpoint) + target_encoder (DinoV3 - same architecture as the context encoder)
+        dict_models = init_model_dinov3(
+            device=device,
+            encoder_model_name=config.encoder_model_name,
+            encoder_weights_path=config.encoder_weights_source,
+            predictor_depth=config.predictor_depth,
+            encoder_embed_dim=config.encoder_embed_dim,
+            predictor_embed_dim=config.predictor_embed_dim,
+            predictor_num_patches=(config.crop_size // config.patch_size) * (config.crop_size // config.patch_size),
+            predictor_num_heads=config.predictor_num_heads,
+            target_encoder_model_name=config.target_encoder_model_name,
+            target_encoder_weights_path=config.target_encoder_weights_source
+        )
+
+        # Load the pre-trained checkpoint (encoder + target encoder - DinoV3 VitS, predictor - IJepa checkpoint)
+        print(f"Loading checkpoint from: {CKPT_FILE_PATH}")
+        checkpoint_models = load_models_from_checkpoint(
+            checkpoint_path=CKPT_FILE_PATH,
+            encoder=dict_models["encoder"],
+            predictor=dict_models["predictor"],
+            target_encoder=dict_models["target_encoder"],
+            optimizer=None,
+            scaler=None,
+            dinov3_ckpt=True
+        )
+        encoder = checkpoint_models["encoder"]
+        predictor = checkpoint_models["predictor"]
+        target_encoder = checkpoint_models["target_encoder"]
+
+        inverse_image_transform, eval_loader = load_evaluation_dataset(config)
+        
+        print("Number of evaluation samples: ", len(eval_loader))
+
+        # Used for sampling the size of a target block
+        mask_collator = MaskCollator(
+            input_size=(config.crop_size, config.crop_size),
+            patch_size=config.patch_size
+        )
+        torch_generator = torch.Generator()
+
+        list_box_sizes = []
+        list_image_names = []
+        list_mean_distances_per_image = []
+        list_max_distances_per_image = []
+        list_labels = []
+        list_seeds = []
+        list_cropped_borders_dicts = []
+
+        # -- used for building the anomaly map
+        num_patches = (config.crop_size // config.patch_size) * (config.crop_size // config.patch_size)
+        image_per_patch_distances = {}
+        # --
+        
+        encoder.eval()
+        target_encoder.eval()
+        predictor.eval()
+
         for box_idx in tqdm(range(NUM_TARGET_BOXES_PER_IMAGE)):
             seed = box_idx
             torch_generator.manual_seed(seed)
