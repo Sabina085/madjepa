@@ -1,7 +1,7 @@
 import yaml
 from typing import Tuple
 
-class Config():
+class TrainIjepaConfig():
     use_bfloat16: bool
     load_checkpoint_path: str
     checkpoint_type: str
@@ -65,8 +65,8 @@ class Config():
     logging_folder: str
     tag: str
 
-def read_config(config_path: str) -> Config:
-    config = Config()
+def read_train_ijepa_config(config_path: str) -> TrainIjepaConfig:
+    config = TrainIjepaConfig()
     with open(config_path, "r") as f:
         config_dict = yaml.safe_load(f)
 
@@ -145,4 +145,45 @@ def read_config(config_path: str) -> Config:
 
     return config
 
-   
+
+class InferenceAnomalyDetectionConfig():
+   # --- data
+   dataset_name: str
+   experiment_name: str
+   split: str
+
+   # --- inference 
+   num_sampled_random_boxes_per_image: int
+   distance: str
+   aggregate_patches_strategy: str
+   gaussian_filter_blur_sigma: int
+   image_statistic_for_classification: str
+
+   # --- misc
+   save_images_with_masks: bool
+
+
+def read_inference_anomaly_detection_config(config_path: str) -> InferenceAnomalyDetectionConfig:
+    with open(config_path, "r") as f:
+        yaml_dict = yaml.safe_load(f)
+
+    config = InferenceAnomalyDetectionConfig()
+    # --- data
+    config.dataset_name = yaml_dict["data"]["dataset_name"]
+    config.experiment_name = yaml_dict["data"]["experiment_name"]
+    config.split = yaml_dict["data"]["split"]
+
+    # --- inference
+    # How many random target boxes to sample per image
+    config.num_sampled_random_boxes_per_image = yaml_dict["inference"]["num_sampled_random_boxes_per_image"]
+    config.distance = yaml_dict["inference"]["distance"]
+    config.aggregate_patches_strategy = yaml_dict["inference"]["aggregate_patches_strategy"]
+    config.gaussian_filter_blur_sigma = yaml_dict["inference"]["gaussian_filter_blur_sigma"]
+    # For computing the image-level metrics
+    config.image_statistic_for_classification = yaml_dict["inference"]["image_statistic_for_classification"]
+
+    # --- misc
+    # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
+    config.save_images_with_masks = yaml_dict["misc"]["save_images_with_masks"]
+
+    return config

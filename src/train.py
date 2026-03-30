@@ -81,7 +81,7 @@ def main(*args, **kwargs):
         torch.cuda.set_device(device)
 
     # Read training config file
-    config = read_config(config_path=kwargs["config_path"])
+    config = read_train_ijepa_config(config_path=kwargs["config_path"])
 
     with open(kwargs["config_path"], "r") as f:
         yaml_config = yaml.safe_load(f)
