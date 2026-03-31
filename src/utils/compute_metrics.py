@@ -7,7 +7,12 @@ from sklearn.metrics import roc_curve, roc_auc_score, RocCurveDisplay
 sns.set_theme()
 
 
-def compute_roc_auc_metrics(PER_IMAGE_STATISTIC, anomaly_maps_paths, segmentation_paths):
+def compute_roc_auc_metrics(
+        image_statistic_for_classification,
+        anomaly_maps_paths, 
+        segmentation_paths,
+        plot_probability_distribution_path,
+        plot_roc_path):
     anomaly_maps_list = []
     gt_label_list = []
     gt_segmentations_list = []
@@ -20,9 +25,9 @@ def compute_roc_auc_metrics(PER_IMAGE_STATISTIC, anomaly_maps_paths, segmentatio
 
     # for computing an image level ROCAUC
     # compute an anomaly score at image level
-        if PER_IMAGE_STATISTIC == "mean":
+        if image_statistic_for_classification == "mean":
             image_scores.append(np.mean(anomaly_map))
-        elif PER_IMAGE_STATISTIC == "max":
+        elif image_statistic_for_classification == "max":
             image_scores.append(np.max(anomaly_map))
         gt_label_list.append(int(anomaly_map_path[-5]))
 
@@ -43,11 +48,11 @@ def compute_roc_auc_metrics(PER_IMAGE_STATISTIC, anomaly_maps_paths, segmentatio
 
     display = RocCurveDisplay.from_predictions(y_true=gt_label_list, y_score=image_scores)
     display.plot()
-    plt.savefig("Image_roc_curve.png")
+    plt.savefig(plot_roc_path)
 
     predictions_df = pd.DataFrame({"prediction": image_scores, "label": gt_label_list})
     sns.displot(predictions_df, x="prediction", hue="label", kind="hist")
-    plt.savefig("my_plot.png")
+    plt.savefig(plot_probability_distribution_path)
     plt.close()
 
     # Calculate per-pixel level ROCAUC

@@ -1,72 +1,105 @@
 import os
+import argparse
 import glob
 import pandas as pd
+from src.utils.configs import *
 from src.utils.compute_metrics import compute_roc_auc_metrics
 
+class MetricsComputer:
+    def __init__(self, inference_config_path: str):
+        self.inference_config = read_inference_anomaly_detection_config(
+            config_path=inference_config_path)
 
-subpath_list = os.getcwd().split(os.sep)
-root_directory_path = os.path.join(*subpath_list[:-1])
-current_dir = subpath_list[-1]
+        subpath_list = os.getcwd().split(os.sep)
+        root_directory_path = os.path.join(*subpath_list[:-1])
+        current_dir = subpath_list[-1]
 
-###  To modify these configuration values
-DATASET_NAME = "BraTS2021_slice"
-SPLIT = "valid"
-AGGREGATE_PATCHES_STRATEGY = "mean"
-NUM_TARGET_BOXES_PER_IMAGE = 30
-GAUSSIAN_FILTER_BLUR_SIGMA = 4
-DISTANCE = "l2"
+        self.experiment_folder_path = (
+            f"/{root_directory_path}/{current_dir}/"
+            f"experiments_{self.inference_config.dataset_name}/"
+            f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
+        )
 
-# For computing the image-level metrics
-PER_IMAGE_STATISTIC = "max"
-###
+        self.anomaly_maps_arrays_path = (
+            f"{self.experiment_folder_path}/"
+            f"anomaly_maps_arrays_{self.inference_config.distance}_distance_"
+            f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
+            f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
+            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+        )
 
-EXPERIMENT_FOLDER_NAME = "test_experiment"
+        self.metrics_folder = f"{self.experiment_folder_path}/Metrics"
+        os.makedirs(self.metrics_folder, exist_ok=True)
 
-EXPERIMENT_FOLDER_PATH = (
-    f"/{root_directory_path}/{current_dir}/"
-    f"experiments_{DATASET_NAME}/{EXPERIMENT_FOLDER_NAME}/results_{SPLIT}"
-)
+        self.metrics_path = (
+            f"{self.metrics_folder}/metrics_{self.inference_config.distance}_distance_"
+            f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
+            f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
+            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+            f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}.csv"
+        )
 
-ANOMALY_MAPS_ARRAYS_PATH = (
-    f"{EXPERIMENT_FOLDER_PATH}/"
-    f"anomaly_maps_arrays_{DISTANCE}_distance_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_"
-    f"{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}"
-)
+        self.probability_distribution_plot_path = (
+            f"{self.metrics_folder}/probability_distribution_plot_{self.inference_config.distance}_distance_"
+            f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
+            f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
+            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+            f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}.png"
+        )
 
-METRICS_FOLDER = f"{EXPERIMENT_FOLDER_PATH}/Metrics"
-os.makedirs(METRICS_FOLDER, exist_ok=True)
+        self.roc_plot_path = (
+            f"{self.metrics_folder}/roc_plot_{self.inference_config.distance}_distance_"
+            f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
+            f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
+            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+            f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}.png"
+        )
 
-METRICS_PATH = (
-    f"{METRICS_FOLDER}/metrics_{DISTANCE}_distance_{AGGREGATE_PATCHES_STRATEGY}_agg_strategy_"
-    f"{NUM_TARGET_BOXES_PER_IMAGE}_boxes_sigma_{GAUSSIAN_FILTER_BLUR_SIGMA}_per_image_statistic_{PER_IMAGE_STATISTIC}.csv"
-)
+    def run(self):
+        anomaly_maps_paths = [
+            file_path for file_path in 
+            glob.glob(os.path.join(self.anomaly_maps_arrays_path, "*.npy"))
+            if "_anomaly_map_" in file_path
+        ]
+
+        segmentation_paths = [
+            anomaly_map_path.replace("_anomaly_map_", "_segmentation_mask_") 
+            for anomaly_map_path in anomaly_maps_paths]
+
+        roc_auc_metrics = compute_roc_auc_metrics(
+            image_statistic_for_classification=self.inference_config.image_statistic_for_classification, 
+            anomaly_maps_paths=anomaly_maps_paths, 
+            segmentation_paths=segmentation_paths,
+            plot_probability_distribution_path=self.probability_distribution_plot_path,
+            plot_roc_path=self.roc_plot_path
+        )
+        print('Image-level ROC-AUC: %.5f' % (roc_auc_metrics["image_roc_auc"]))
+        print('Pixel-level ROC-AUC: %.5f' % (roc_auc_metrics["pixel_roc_auc"]))
+
+        metrics_df = pd.DataFrame(
+            {
+                "DATASET_NAME": [self.inference_config.dataset_name],
+                "SPLIT": [self.inference_config.split],
+                "AGGREGATE_PATCHES_STRATEGY": [self.inference_config.aggregate_patches_strategy],
+                "NUM_TARGET_BOXES_PER_IMAGE": [self.inference_config.num_sampled_random_boxes_per_image],
+                "GAUSSIAN_FILTER_BLUR_SIGMA": [self.inference_config.gaussian_filter_blur_sigma],
+                "PER_IMAGE_STATISTIC": [self.inference_config.image_statistic_for_classification],
+                "Image ROCAUC": [roc_auc_metrics["image_roc_auc"]],
+                "Pixel ROCAUC": [roc_auc_metrics["pixel_roc_auc"]],
+                "DISTANCE": [self.inference_config.distance],
+                "EXPERIMENT_NAME": [self.inference_config.experiment_name],
+            }
+        ) 
+        metrics_df.to_csv(self.metrics_path, index=False)
+    
+
+def main(*args, **kwargs):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--inference_config_path", type=str, help="Path to the inference config used for generating the anomaly maps.")
+
+    args = parser.parse_args()
+    metrics_computer = MetricsComputer(inference_config_path=args.inference_config_path)
+    metrics_computer.run()
 
 if __name__ == "__main__":
-    anomaly_maps_paths = [
-        file_path for file_path in 
-        glob.glob(os.path.join(ANOMALY_MAPS_ARRAYS_PATH, "*.npy")) if "_anomaly_map_" in file_path]
-
-    segmentation_paths = [
-        anomaly_map_path.replace("_anomaly_map_", "_segmentation_mask_") 
-        for anomaly_map_path in anomaly_maps_paths]
-
-
-    roc_auc_metrics = compute_roc_auc_metrics(PER_IMAGE_STATISTIC, anomaly_maps_paths, segmentation_paths)
-    print('Image-level ROC-AUC: %.5f' % (roc_auc_metrics["image_roc_auc"]))
-    print('Pixel-level ROC-AUC: %.5f' % (roc_auc_metrics["pixel_roc_auc"]))
-
-    metrics_df = pd.DataFrame(
-        {
-            "DATASET_NAME": [DATASET_NAME],
-            "SPLIT": [SPLIT],
-            "AGGREGATE_PATCHES_STRATEGY": [AGGREGATE_PATCHES_STRATEGY],
-            "NUM_TARGET_BOXES_PER_IMAGE": [NUM_TARGET_BOXES_PER_IMAGE],
-            "GAUSSIAN_FILTER_BLUR_SIGMA": [GAUSSIAN_FILTER_BLUR_SIGMA],
-            "PER_IMAGE_STATISTIC": [PER_IMAGE_STATISTIC],
-            "Image ROCAUC": [roc_auc_metrics["image_roc_auc"]],
-            "Pixel ROCAUC": [roc_auc_metrics["pixel_roc_auc"]],
-            "DISTANCE": [DISTANCE],
-            "EXPERIMENT_NAME": [EXPERIMENT_FOLDER_NAME],
-        }
-    ) 
-    metrics_df.to_csv(METRICS_PATH, index=False)
+    main()
