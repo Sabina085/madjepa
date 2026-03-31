@@ -1,6 +1,8 @@
+import sys
+sys.path.append("/home/vhondru/istoian/ijepa-anomaly-detection")
+
 import torch
 import logging
-import sys
 import src.models.vision_transformer as vit
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)

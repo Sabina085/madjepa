@@ -12,6 +12,8 @@ from src.utils.inference import *
 from src.utils.configs import *
 from src.utils.anomaly_maps import *
 
+STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
+
 
 class AnomalyMapsBuilder:
     def __init__(self, inference_config_path: str):
@@ -21,7 +23,7 @@ class AnomalyMapsBuilder:
         root_directory_path = os.path.join(*subpath_list[:-1])
         current_dir = subpath_list[-1]
 
-        self.evaluation_dataset_path = (f"/media/vhondru/hdd/istoian/BMAD/dataset/"
+        self.evaluation_dataset_path = (f"{STORAGE_PARENT_FOLDER_PATH}"
                                         f"{self.inference_config.dataset_name}/{self.inference_config.split}")
         
         self.experiment_folder_path = (
