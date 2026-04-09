@@ -187,3 +187,48 @@ def read_inference_anomaly_detection_config(config_path: str) -> InferenceAnomal
     config.save_images_with_masks = yaml_dict["misc"]["save_images_with_masks"]
 
     return config
+
+
+class TrainDistillationConfig:
+    # --- data
+    dataset_name: str
+    experiment_name: str
+
+    # --- model
+    hidden_size: int
+    num_hidden_layers: int
+    num_attention_heads: int
+    intermediate_size: int
+
+    # --- optimization
+    num_epochs: int
+    warmup_epochs: int
+    train_batch_size: int
+    start_lr: float
+    peak_lr: float
+    final_lr: float
+    weight_decay: float
+
+
+def read_train_distillation_config(config_path: str) -> TrainDistillationConfig:
+    with open(config_path, "r") as f:
+        yaml_dict = yaml.safe_load(f)
+    config = TrainDistillationConfig()
+
+    config.dataset_name = yaml_dict["data"]["dataset_name"]
+    config.experiment_name = yaml_dict["data"]["experiment_name"]
+
+    config.hidden_size = yaml_dict["model"]["hidden_size"]
+    config.num_hidden_layers = yaml_dict["model"]["num_hidden_layers"]
+    config.num_attention_heads = yaml_dict["model"]["num_attention_heads"]
+    config.intermediate_size = yaml_dict["model"]["intermediate_size"]
+
+    config.num_epochs = yaml_dict["optimization"]["num_epochs"]
+    config.warmup_epochs = yaml_dict["optimization"]["warmup_epochs"]
+    config.train_batch_size = yaml_dict["optimization"]["train_batch_size"]
+    config.start_lr = float(yaml_dict["optimization"]["start_lr"])
+    config.peak_lr = float(yaml_dict["optimization"]["peak_lr"])
+    config.final_lr = float(yaml_dict["optimization"]["final_lr"])
+    config.weight_decay = float(yaml_dict["optimization"]["weight_decay"])
+
+    return config

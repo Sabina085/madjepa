@@ -2,17 +2,19 @@ import os
 import argparse
 import glob
 import pandas as pd
+from pathlib import Path
 from src.utils.configs import *
 from src.utils.compute_metrics import compute_roc_auc_metrics
 
 class MetricsComputer:
-    def __init__(self, inference_config_path: str):
+    def __init__(self, inference_config_path: str, weight_distillation: float=0.0):
         self.inference_config = read_inference_anomaly_detection_config(
             config_path=inference_config_path)
 
         subpath_list = os.getcwd().split(os.sep)
         root_directory_path = os.path.join(*subpath_list[:-1])
         current_dir = subpath_list[-1]
+        self.weight_distillation = weight_distillation
 
         self.experiment_folder_path = (
             f"/{root_directory_path}/{current_dir}/"
@@ -28,6 +30,12 @@ class MetricsComputer:
             f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
         )
 
+        self.anomaly_maps_distillation_arrays_path = (
+            f"{self.experiment_folder_path}/"
+            f"anomaly_maps_arrays_distillation_{self.inference_config.distance}_distance_"
+            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+        )
+
         self.metrics_folder = f"{self.experiment_folder_path}/Metrics"
         os.makedirs(self.metrics_folder, exist_ok=True)
 
@@ -36,7 +44,8 @@ class MetricsComputer:
             f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
             f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
-            f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}.csv"
+            f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
+            f"_distillation_weight_{self.weight_distillation}.csv"
         )
 
         self.probability_distribution_plot_path = (
@@ -44,7 +53,8 @@ class MetricsComputer:
             f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
             f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
-            f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}.png"
+            f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
+            f"_distillation_weight_{self.weight_distillation}.png"
         )
 
         self.roc_plot_path = (
@@ -52,7 +62,8 @@ class MetricsComputer:
             f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
             f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
-            f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}.png"
+            f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
+            f"_distillation_weight_{self.weight_distillation}.png"
         )
 
     def run(self):
@@ -62,6 +73,15 @@ class MetricsComputer:
             if "_anomaly_map_" in file_path
         ]
 
+        anomaly_maps_distillation_paths = []
+        for anomaly_maps_path in anomaly_maps_paths:
+            anomaly_maps_distillation_paths.append(
+                os.path.join(
+                    self.anomaly_maps_distillation_arrays_path,
+                    Path(anomaly_maps_path).name
+                    )
+            )
+
         segmentation_paths = [
             anomaly_map_path.replace("_anomaly_map_", "_segmentation_mask_") 
             for anomaly_map_path in anomaly_maps_paths]
@@ -69,9 +89,11 @@ class MetricsComputer:
         roc_auc_metrics = compute_roc_auc_metrics(
             image_statistic_for_classification=self.inference_config.image_statistic_for_classification, 
             anomaly_maps_paths=anomaly_maps_paths, 
+            anomaly_maps_distillation=anomaly_maps_distillation_paths,
             segmentation_paths=segmentation_paths,
             plot_probability_distribution_path=self.probability_distribution_plot_path,
-            plot_roc_path=self.roc_plot_path
+            plot_roc_path=self.roc_plot_path,
+            weight_distillation=self.weight_distillation
         )
         print('Image-level ROC-AUC: %.5f' % (roc_auc_metrics["image_roc_auc"]))
         print('Pixel-level ROC-AUC: %.5f' % (roc_auc_metrics["pixel_roc_auc"]))
@@ -87,6 +109,7 @@ class MetricsComputer:
                 "Image ROCAUC": [roc_auc_metrics["image_roc_auc"]],
                 "Pixel ROCAUC": [roc_auc_metrics["pixel_roc_auc"]],
                 "DISTANCE": [self.inference_config.distance],
+                "WEIGHT_DISTILLATION": [self.weight_distillation],
                 "EXPERIMENT_NAME": [self.inference_config.experiment_name],
             }
         ) 
@@ -96,9 +119,13 @@ class MetricsComputer:
 def main(*args, **kwargs):
     parser = argparse.ArgumentParser()
     parser.add_argument("--inference_config_path", type=str, help="Path to the inference config used for generating the anomaly maps.")
+    parser.add_argument("--weight_distillation", type=float, default=0.0, help="Weight of the distillation anomaly map when computing the metrics.")
 
     args = parser.parse_args()
-    metrics_computer = MetricsComputer(inference_config_path=args.inference_config_path)
+    metrics_computer = MetricsComputer(
+        inference_config_path=args.inference_config_path,
+        weight_distillation=args.weight_distillation
+    )
     metrics_computer.run()
 
 if __name__ == "__main__":

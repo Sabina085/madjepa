@@ -16,7 +16,7 @@ STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
 
 
 class AnomalyMapsBuilder:
-    def __init__(self, inference_config_path: str):
+    def __init__(self, inference_config_path: str, use_distillation_model: bool=False):
         self.inference_config = read_inference_anomaly_detection_config(config_path=inference_config_path)
 
         subpath_list = os.getcwd().split(os.sep)
@@ -41,27 +41,47 @@ class AnomalyMapsBuilder:
         # Read the ijepa training configuration file (which was used for training the checkpoint)
         self.train_config = read_train_ijepa_config(config_path=self.train_config_path)
 
-        self.anomaly_maps_arrays_path = (
-            f"{self.experiment_folder_path}/"
-            f"anomaly_maps_arrays_{self.inference_config.distance}_distance_"
-            f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
-            f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_sigma_"
-            f"{self.inference_config.gaussian_filter_blur_sigma}"
-        )
+        if not use_distillation_model:
+            # computing the anomaly map using the random boxes sampling
+            self.anomaly_maps_arrays_path = (
+                f"{self.experiment_folder_path}/"
+                f"anomaly_maps_arrays_{self.inference_config.distance}_distance_"
+                f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
+                f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_sigma_"
+                f"{self.inference_config.gaussian_filter_blur_sigma}"
+            )
 
-        self.anomaly_maps_images_path = (
-            f"{self.experiment_folder_path}/"
-            f"anomaly_maps_images_{self.inference_config.distance}_distance_"
-            f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
-            f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
-            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
-        )
+            self.anomaly_maps_images_path = (
+                f"{self.experiment_folder_path}/"
+                f"anomaly_maps_images_{self.inference_config.distance}_distance_"
+                f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
+                f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
+                f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+            )
 
-        self.saved_dicts_folder = (
-            f"{self.experiment_folder_path}/"
-            f"image_per_patch_{self.inference_config.distance}_distances_"
-            f"{self.inference_config.num_sampled_random_boxes_per_image}_seeds"
-        )
+            self.saved_dicts_folder = (
+                f"{self.experiment_folder_path}/"
+                f"image_per_patch_{self.inference_config.distance}_distances_"
+                f"{self.inference_config.num_sampled_random_boxes_per_image}_seeds"
+            )
+        else:
+            # computing the anomaly boxes using the distillation model output
+            self.anomaly_maps_arrays_path = (
+                f"{self.experiment_folder_path}/"
+                f"anomaly_maps_arrays_distillation_{self.inference_config.distance}_distance_"
+                f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+            )
+
+            self.anomaly_maps_images_path = (
+                f"{self.experiment_folder_path}/"
+                f"anomaly_maps_images_distillation_{self.inference_config.distance}_distance_"
+                f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+            )
+            self.saved_dicts_folder = (
+                f"{self.experiment_folder_path}/"
+                f"image_per_patch_{self.inference_config.distance}_distances_"
+                f"distilled_model/"
+            )
 
         self.save_cropped_borders_dict_folder = (
             f"{self.experiment_folder_path}/"
@@ -230,9 +250,17 @@ def main(*args, **kwargs):
         type=str,
         help="Path to the inference configuration that was used for generating the results."
     )
+    parser.add_argument(
+        "--use_distillation_model",
+        action="store_true",
+        help="Enable anomaly map computation using the distillation model"
+    )
     args = parser.parse_args()
 
-    anomaly_maps_builder = AnomalyMapsBuilder(inference_config_path=args.inference_config_path)
+    anomaly_maps_builder = AnomalyMapsBuilder(
+        inference_config_path=args.inference_config_path,
+        use_distillation_model=args.use_distillation_model
+    )
     anomaly_maps_builder.run()
 
 if __name__ == "__main__":

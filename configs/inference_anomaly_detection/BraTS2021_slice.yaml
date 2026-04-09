@@ -2,7 +2,7 @@
 
 data:
   dataset_name: "BraTS2021_slice"
-  experiment_name: "test_experiment"
+  experiment_name: "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training"
   split: "valid"
 
 inference:
@@ -16,4 +16,4 @@ inference:
 
 misc:
   # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
-  save_images_with_masks: True
+  save_images_with_masks: False

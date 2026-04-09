@@ -10,9 +10,12 @@ sns.set_theme()
 def compute_roc_auc_metrics(
         image_statistic_for_classification,
         anomaly_maps_paths, 
+        anomaly_maps_distillation,
         segmentation_paths,
         plot_probability_distribution_path,
-        plot_roc_path):
+        plot_roc_path,
+        weight_distillation
+    ):
     anomaly_maps_list = []
     gt_label_list = []
     gt_segmentations_list = []
@@ -20,11 +23,13 @@ def compute_roc_auc_metrics(
     image_name_list = []
     image_scores = []
 
-    for anomaly_map_path, segmentation_path in zip(anomaly_maps_paths, segmentation_paths):
+    for anomaly_map_path, anomaly_map_distillation, segmentation_path in zip(anomaly_maps_paths, anomaly_maps_distillation, segmentation_paths):
         anomaly_map = np.load(anomaly_map_path)
+        anomaly_map_distillation = np.load(anomaly_map_distillation)
+        anomaly_map = anomaly_map * (1 - weight_distillation) + anomaly_map_distillation * weight_distillation
 
-    # for computing an image level ROCAUC
-    # compute an anomaly score at image level
+        # for computing an image level ROCAUC
+        # compute an anomaly score at image level
         if image_statistic_for_classification == "mean":
             image_scores.append(np.mean(anomaly_map))
         elif image_statistic_for_classification == "max":
