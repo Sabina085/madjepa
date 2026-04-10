@@ -4,7 +4,7 @@ meta:
   checkpoint_type: dinov3
   # encoder
   encoder_model_name: dinov3_vits16
-  encoder_weights_source: pretrained_checkpoints/dinov3_checkpoints/dinov3_vits16_pretrain_lvd1689m-08c60483.pth
+  encoder_weights_source: pretrained_checkpoints/dinov3_models/dinov3_vits16_pretrain_lvd1689m-08c60483.pth
   encoder_embed_dim: 384
   # predictor
   predictor_model_name: ijepa_predictor_from_IN22K_vitg16_600e
@@ -14,7 +14,7 @@ meta:
   predictor_num_heads: 16
   # target encoder
   target_encoder_model_name: dinov3_vits16 # should be the same as for the context encoder 
-  target_encoder_weights_source : pretrained_checkpoints/dinov3_checkpoints/dinov3_vits16_pretrain_lvd1689m-08c60483.pth # should be the same as for the context encoder
+  target_encoder_weights_source : pretrained_checkpoints/dinov3_models/dinov3_vits16_pretrain_lvd1689m-08c60483.pth # should be the same as for the context encoder
 
 data:
  # training specifics
