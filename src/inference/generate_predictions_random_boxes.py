@@ -20,7 +20,7 @@ from src.masks.utils import apply_masks
 from src.utils.tensors import repeat_interleave_batch
 from src.masks.multiblock import MaskCollator
 
-STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
+STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
 
 class PredictionsRandomBoxesGenerator:
     def __init__(self, inference_config_path: str):

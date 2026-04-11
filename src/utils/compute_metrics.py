@@ -47,8 +47,8 @@ def compute_roc_auc_metrics(
 
     # Calculate image-level ROC AUC score
     fprs, tprs, thresholds = roc_curve(y_true=gt_label_list, y_score=image_scores)
-    for fpr, tpr, threshold in zip(fprs, tprs, thresholds):
-        print(f"threshold: {threshold} -> fpr: {fpr}, tpr: {tpr}")
+    # for fpr, tpr, threshold in zip(fprs, tprs, thresholds):
+    #     print(f"threshold: {threshold} -> fpr: {fpr}, tpr: {tpr}")
     image_roc_auc = roc_auc_score(y_true=gt_label_list, y_score=image_scores)
 
     display = RocCurveDisplay.from_predictions(y_true=gt_label_list, y_score=image_scores)

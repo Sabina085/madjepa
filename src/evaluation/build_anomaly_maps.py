@@ -12,7 +12,7 @@ from src.utils.inference import *
 from src.utils.configs import *
 from src.utils.anomaly_maps import *
 
-STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
+STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
 
 
 class AnomalyMapsBuilder:
@@ -110,17 +110,18 @@ class AnomalyMapsBuilder:
             with open(saved_borders_dict_path, "r") as f:
                 borders_dict = json.load(f)
 
-            crop_height = borders_dict["bottom"] - borders_dict["top"] + 1
-            crop_width = borders_dict["right"] - borders_dict["left"] + 1
             
-            anomaly_map = build_anomaly_map_interpolation(
+            anomaly_map = build_anomaly_map_with_borders(
                 per_patch_distances_dict=distance_dict,
+                patch_size=self.train_config.patch_size,
+                borders_dict=borders_dict,
                 model_input_height=self.train_config.crop_size,
                 model_input_width=self.train_config.crop_size,
-                crop_height=crop_height,
-                crop_width=crop_width,
-                patch_size=self.train_config.patch_size,
-                agg_strategy=self.inference_config.aggregate_patches_strategy)
+                original_image_height=borders_dict["original_image_height"],
+                original_image_width=borders_dict["original_image_width"],
+                agg_strategy=self.inference_config.aggregate_patches_strategy,
+                interpolation_method=cv2.INTER_LINEAR
+            )
             
             if self.inference_config.gaussian_filter_blur_sigma != -1:
                 anomaly_map = gaussian_filter(
