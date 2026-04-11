@@ -55,8 +55,8 @@ def compute_roc_auc_metrics(
     display.plot()
     plt.savefig(plot_roc_path)
 
-    predictions_df = pd.DataFrame({"prediction": image_scores, "label": gt_label_list})
-    sns.displot(predictions_df, x="prediction", hue="label", kind="hist")
+    predictions_df = pd.DataFrame({"anomaly_score": image_scores, "label": gt_label_list})
+    sns.displot(predictions_df, x="anomaly_score", hue="label", kind="hist", bins=50)
     plt.savefig(plot_probability_distribution_path)
     plt.close()
 
