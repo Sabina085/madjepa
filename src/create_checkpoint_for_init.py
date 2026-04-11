@@ -1,5 +1,5 @@
 import sys
-sys.path.append("/home/vhondru/istoian/ijepa-anomaly-detection")
+sys.path.append("/home/sabina/PhD/IJepa-AD/ijepa-anomaly-detection")
 
 import torch
 import logging

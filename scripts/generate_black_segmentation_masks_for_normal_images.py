@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 from PIL import Image
 
-IMAGES_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/RESC/test/good/img"
+IMAGES_FOLDER_PATH = "/home/sabina/PhD/BMAD/RESC/test/good/img"
 SEGMENTATION_MASKS_FOLDER_PATH = IMAGES_FOLDER_PATH.replace("img", "label")
 
 os.makedirs(SEGMENTATION_MASKS_FOLDER_PATH, exist_ok=True)

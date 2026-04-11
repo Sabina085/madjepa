@@ -27,7 +27,7 @@ data:
   count_border_pixels: 10
 
   image_folder: RESC/train/
-  data_root_folder_path: /media/vhondru/hdd/istoian/BMAD/dataset
+  data_root_folder_path: /home/sabina/PhD/BMAD
   pin_mem: True
   num_workers: 10
 
