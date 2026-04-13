@@ -228,13 +228,14 @@ class DistilledModelTrainer:
             train_loss_per_epoch: List[float],
             valid_normal_loss_per_epoch: List[float], 
             valid_anomaly_loss_per_epoch: List[float],
+            valid_anomaly_normal_difference_loss_per_epoch: List[float]
         ):
         loss_plot_path = f"{self.distilled_model_folder_path}/loss_plot.png"
         loss_df = pd.DataFrame(
             {
-                "epoch": [i for i in range(num_epochs)] + [i for i in range(num_epochs)] + [i for i in range(num_epochs)],
-                "loss": train_loss_per_epoch + valid_normal_loss_per_epoch + valid_anomaly_loss_per_epoch,
-                "split": ["train"] * num_epochs + ["valid_normal"] * num_epochs + ["valid_anomaly"] * num_epochs
+                "epoch": [i for i in range(num_epochs)] + [i for i in range(num_epochs)] + [i for i in range(num_epochs)] + [i for i in range(num_epochs)],
+                "loss": train_loss_per_epoch + valid_normal_loss_per_epoch + valid_anomaly_loss_per_epoch + valid_anomaly_normal_difference_loss_per_epoch,
+                "split": ["loss_train"] * num_epochs + ["loss_valid_normal"] * num_epochs + ["loss_valid_anomaly"] * num_epochs + ["difference_anomaly_normal"] * num_epochs
             }
         )
         loss_plot = sns.lineplot(loss_df, x="epoch", y="loss", hue="split")
@@ -258,6 +259,7 @@ class DistilledModelTrainer:
         train_loss_per_epoch = []
         valid_anomaly_loss_per_epoch = []
         valid_normal_loss_per_epoch = []
+        valid_anomaly_normal_difference_loss_per_epoch = []
 
         for epoch in range(self.train_distillation_config.num_epochs):
             print('Epoch %d' % epoch)
@@ -323,14 +325,19 @@ class DistilledModelTrainer:
                             valid_loss_normal = valid_loss[normal_indices].mean(axis=(1, 2))
                             valid_losses_normal += valid_loss_normal.tolist()
 
-
                 assert len(self.valid_dataset) == len(valid_losses_anomaly) + len(valid_losses_normal)
+
                 avg_valid_loss_anomaly_crt_epoch = np.mean(valid_losses_anomaly)
                 avg_valid_loss_normal_crt_epoch = np.mean(valid_losses_normal)
+                avg_difference_loss_anomaly_normal_crt_epoch = avg_valid_loss_anomaly_crt_epoch - avg_valid_loss_normal_crt_epoch
+
                 print(f"Average validation anomaly loss epoch {epoch} = {avg_valid_loss_anomaly_crt_epoch}")
                 print(f"Average validation normal loss epoch {epoch} = {avg_valid_loss_normal_crt_epoch}")
+                print(f"Average validation anomaly - normal loss epoch {epoch} = {avg_difference_loss_anomaly_normal_crt_epoch}")
+                
                 valid_anomaly_loss_per_epoch.append(avg_valid_loss_anomaly_crt_epoch)
                 valid_normal_loss_per_epoch.append(avg_valid_loss_normal_crt_epoch)
+                valid_anomaly_normal_difference_loss_per_epoch.append(avg_difference_loss_anomaly_normal_crt_epoch)
 
             self.scheduler.step()
 
@@ -341,7 +348,8 @@ class DistilledModelTrainer:
             num_epochs=self.train_distillation_config.num_epochs,
             train_loss_per_epoch=train_loss_per_epoch,
             valid_normal_loss_per_epoch=valid_normal_loss_per_epoch,
-            valid_anomaly_loss_per_epoch=valid_anomaly_loss_per_epoch
+            valid_anomaly_loss_per_epoch=valid_anomaly_loss_per_epoch,
+            valid_anomaly_normal_difference_loss_per_epoch=valid_anomaly_normal_difference_loss_per_epoch
         )
 
 def main(*args, **kwargs):
