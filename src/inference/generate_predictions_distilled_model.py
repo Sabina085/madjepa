@@ -28,9 +28,12 @@ class PredictionsDistilledModelGenerator:
     def __init__(
             self, 
             inference_config_path: str,
+            train_distilled_model_config_path: str
         ):
         # Read the inference configuration file for anomaly detection
         self.inference_anomaly_detection_config = read_inference_anomaly_detection_config(config_path=inference_config_path)
+        self.distillation_model_path = train_distilled_model_config_path.replace("config.json", "student_model.pth")
+        self.distillation_train_config_path = train_distilled_model_config_path
 
         subpath_list = os.getcwd().split(os.sep)
         root_directory_path = os.path.join(*subpath_list[:-1])
@@ -45,24 +48,20 @@ class PredictionsDistilledModelGenerator:
         self.distillation_experiment_folder_path = (
             f"{self.experiment_folder_path}/checkpoints_distilled_model"
         )
-        distillation_train_file_paths = glob.glob(os.path.join(self.distillation_experiment_folder_path, "*"))
-        for distillation_train_file_path in distillation_train_file_paths:
-            if distillation_train_file_path.endswith("student_model.pth"):
-                self.distillation_model_path = distillation_train_file_path
-            elif distillation_train_file_path.endswith("config.json"):
-                self.distillation_train_config_path = distillation_train_file_path
 
         self.distillation_train_config = read_train_distillation_config(config_path=self.distillation_train_config_path)
 
         ijepa_train_config_path = (
             f"{self.experiment_folder_path}/logs/config_run.yaml"
         )
+        print("ijepa_train_config_path: ", ijepa_train_config_path)
         
         self.ijepa_train_config = read_train_ijepa_config(config_path=ijepa_train_config_path)
         ijepa_ckpt_folder_path = (
             f"{self.experiment_folder_path}/checkpoints"
         )
         self.ijepa_ckpt_file_path = f"{ijepa_ckpt_folder_path}/{self.inference_anomaly_detection_config.experiment_name}-latest.pth.tar"
+        print("I-Jepa checkpoint file path: ", self.ijepa_ckpt_file_path)
        
         self.save_per_patch_results_folder = (
             f"{self.experiment_folder_path}/results_{self.inference_anomaly_detection_config.split}/"
@@ -70,7 +69,6 @@ class PredictionsDistilledModelGenerator:
             f"distilled_model/"
         )
         os.makedirs(self.save_per_patch_results_folder, exist_ok=True)
-
 
         self.evaluation_dataset_path = (
             f"{STORAGE_PARENT_FOLDER_PATH}/{self.inference_anomaly_detection_config.dataset_name}/"
@@ -226,11 +224,15 @@ def main(*args, **kwargs):
     parser.add_argument(
         "--inference_config_path", type=str, help="Inference configuration file (used for anomaly detection)",
     )
+    parser.add_argument(
+        "--train_distilled_model_config_path", type=str, help="Configuration used for training the distilled model"
+    )
 
     args = parser.parse_args()
 
     predictions_random_boxes_generator = PredictionsDistilledModelGenerator(
         inference_config_path=args.inference_config_path,
+        train_distilled_model_config_path=args.train_distilled_model_config_path
     )
 
     predictions_random_boxes_generator.run()

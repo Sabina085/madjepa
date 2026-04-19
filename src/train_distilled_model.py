@@ -168,7 +168,7 @@ class DistilledModelTrainer:
         )
 
         # Load the pre-trained checkpoint (encoder + target encoder - DinoV3 VitS, predictor - IJepa checkpoint)
-        print(f"Loading checkpoint from: {self.ijepa_ckpt_file_path}")
+        print(f"Loading ijepa checkpoint from: {self.ijepa_ckpt_file_path}")
         loaded_dict_from_checkpoint = load_models_from_checkpoint(
             checkpoint_path=self.ijepa_ckpt_file_path,
             encoder=dict_models["encoder"],
@@ -182,14 +182,9 @@ class DistilledModelTrainer:
         self.target_encoder = loaded_dict_from_checkpoint["target_encoder"]
 
     def _set_optimization_configuration(self):
-        # Make the student model weights trainable
-        for name, param in self.student_model.named_parameters():
-            param.requires_grad == True
-
         # Freeze the target encoder weights
         for name, param in self.target_encoder.named_parameters():
             param.requires_grad = False
-
 
         # Feed the trainable parameters of the student to the optimizer
         trainable_params = [param for param in self.student_model.parameters() if param.requires_grad]
@@ -268,6 +263,7 @@ class DistilledModelTrainer:
             self.student_model.train()
             self.target_encoder.eval()
             for train_batch_idx, (image, _, _) in enumerate(self.train_loader):
+
                 image = image.to(self.device)
                 with torch.no_grad():
                     # --- Target encoder forward prop
@@ -283,23 +279,23 @@ class DistilledModelTrainer:
                 loss.backward()
                 self.optimizer.step()
 
-                loss_value = loss.detach().cpu().item()
-                train_losses.append(loss_value)
-                if train_batch_idx % 20 == 0:
-                    print(f"Train loss batch index {train_batch_idx}: {loss_value}")
+                with torch.no_grad():
+                    loss_value = loss.detach().cpu().item()
+                    train_losses.append(loss_value)
+                    if train_batch_idx % 20 == 0:
+                        print(f"Train loss batch index {train_batch_idx}: {loss_value}")
 
             avg_train_loss_crt_epoch = np.mean(train_losses)
             train_loss_per_epoch.append(avg_train_loss_crt_epoch)
             print(f"Average train loss epoch {epoch} = {avg_train_loss_crt_epoch}")
 
             print("Computing the performance on the validation set...")
+            self.student_model.eval()
+            self.target_encoder.eval()
             with torch.inference_mode():
 
                 valid_losses_anomaly = []
                 valid_losses_normal = []
-
-                self.student_model.eval()
-                self.target_encoder.eval()
 
                 for valid_batch_idx, (image, label, _, _) in enumerate(self.valid_loader):
                     image = image.to(self.device)
@@ -314,8 +310,8 @@ class DistilledModelTrainer:
                         valid_loss = self.valid_criterion(student_emb, target_encoder_emb).detach().cpu().numpy()
                         label_arr = label.detach().cpu().numpy()
 
-                        anomaly_indices = np.where(label_arr == 1)
-                        normal_indices = np.where(label_arr == 0)
+                        anomaly_indices = np.where(label_arr == 1)[0]
+                        normal_indices = np.where(label_arr == 0)[0]
 
                         if len(anomaly_indices) > 0:
                             valid_loss_anomaly = valid_loss[anomaly_indices].mean(axis=(1, 2))
@@ -341,9 +337,8 @@ class DistilledModelTrainer:
 
             self.scheduler.step()
 
-        self._save_results(
+        self._save_results()
 
-        )
         self._save_loss_plot(
             num_epochs=self.train_distillation_config.num_epochs,
             train_loss_per_epoch=train_loss_per_epoch,

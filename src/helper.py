@@ -109,7 +109,6 @@ def load_models_from_checkpoint(
         logger.info(f'Loaded scaler from the checkpoint. Epoch {epoch}')
     
     logger.info(f'Correctly loaded the weights of the models from the checkpoint saved at the path: {checkpoint_path}')
-    del checkpoint
 
     return {
         "encoder": encoder,
