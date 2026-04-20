@@ -23,6 +23,20 @@ data:
   crop_scale:
   - 0.8
   - 1.0
+
+  # image normalization statistics
+  # ImageNet statistics
+  image_transform_statistics:
+  # ImageNet statistics
+    mean:
+    - 0.485
+    - 0.456
+    - 0.406
+    std:
+    - 0.229
+    - 0.224
+    - 0.225
+
   # the border of background pixels left in the input image after ROI cropping
   count_border_pixels: 10
 
@@ -66,13 +80,13 @@ optimization:
 
   lr: 0.001
   start_lr: 0.0002
-  final_lr: 1.0e-04
+  final_lr: 1.0e-06
   warmup: 3
 
-  weight_decay: 0.0001
-  final_weight_decay: 0.001
+  weight_decay: 0.04
+  final_weight_decay: 0.4
 
 
 logging:
-  logging_folder: experiments_RESC/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training_very_low_wd_higher_lr_schedule/logs/
-  write_tag: enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training_very_low_wd_higher_lr_schedule
+  logging_folder: experiments_RESC/experiment_default_hyparams/logs/
+  write_tag: experiment_default_hyparams

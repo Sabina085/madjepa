@@ -1,0 +1,18 @@
+data:
+    dataset_name: RESC
+    experiment_name: experiment_default_hyparams
+
+model:
+    hidden_size: 384
+    num_hidden_layers: 6
+    num_attention_heads: 6
+    intermediate_size: 1536
+
+optimization:
+    num_epochs: 100
+    warmup_epochs: 10
+    train_batch_size: 64
+    start_lr: 1e-6
+    peak_lr: 1e-3
+    final_lr: 1e-5
+    weight_decay: 0.05

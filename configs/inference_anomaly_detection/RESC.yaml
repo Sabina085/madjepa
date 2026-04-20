@@ -1,0 +1,19 @@
+# Inference configuration for BraTS2021_slice dataset
+
+data:
+  dataset_name: "RESC"
+  experiment_name: "experiment_default_hyparams"
+  split: "valid"
+
+inference:
+  # How many random target boxes to sample per image
+  num_sampled_random_boxes_per_image: 30
+  distance: "l2"
+  aggregate_patches_strategy: "mean"
+  gaussian_filter_blur_sigma: 4
+  # For computing the image-level metrics
+  image_statistic_for_classification: "max"
+
+misc:
+  # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
+  save_images_with_masks: True
