@@ -186,7 +186,7 @@ def main(*args, **kwargs):
                 rank=rank,
                 root_path=config.data_root_folder_path,
                 image_folder=config.image_folder,
-                drop_last=True
+                drop_last=False
         )
     elif "hist_DIY" in config.image_folder:
         # Liver CT dataset
@@ -200,7 +200,7 @@ def main(*args, **kwargs):
                 rank=rank,
                 root_path=config.data_root_folder_path,
                 image_folder=config.image_folder,
-                drop_last=True
+                drop_last=False
         )
     elif "RESC" in config.image_folder:
         # RESC dataset
@@ -214,7 +214,7 @@ def main(*args, **kwargs):
                 rank=rank,
                 root_path=config.data_root_folder_path,
                 image_folder=config.image_folder,
-                drop_last=True
+                drop_last=False
         )  
 
     ipe = len(unsupervised_loader)

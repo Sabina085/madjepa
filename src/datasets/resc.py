@@ -24,7 +24,7 @@ def make_resc(
     rank=0,
     root_path=None,
     image_folder=None,
-    drop_last=True
+    drop_last=False
 ):
     dataset = RESC(
         root=root_path,

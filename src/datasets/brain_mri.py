@@ -24,7 +24,7 @@ def make_brain_mri(
     rank=0,
     root_path=None,
     image_folder=None,
-    drop_last=True
+    drop_last=False,
 ):
     dataset = BrainMRI(
         root=root_path,
