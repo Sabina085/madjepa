@@ -16,7 +16,7 @@ STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
 
 
 class AnomalyMapsBuilder:
-    def __init__(self, inference_config_path: str, use_distillation_model: bool=False):
+    def __init__(self, inference_config_path: str, use_distillation_model: bool=False, train_distilled_model_config_path: str=None):
         self.inference_config = read_inference_anomaly_detection_config(config_path=inference_config_path)
 
         subpath_list = os.getcwd().split(os.sep)
@@ -66,21 +66,23 @@ class AnomalyMapsBuilder:
             )
         else:
             # computing the anomaly boxes using the distillation model output
+
+            self.distilled_model_hash_folder = train_distilled_model_config_path.split("/")[-2]
             self.anomaly_maps_arrays_path = (
                 f"{self.experiment_folder_path}/"
                 f"anomaly_maps_arrays_distillation_{self.inference_config.distance}_distance_"
-                f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+                f"sigma_{self.inference_config.gaussian_filter_blur_sigma}_checkpoint_{self.distilled_model_hash_folder}"
             )
 
             self.anomaly_maps_images_path = (
                 f"{self.experiment_folder_path}/"
                 f"anomaly_maps_images_distillation_{self.inference_config.distance}_distance_"
-                f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+                f"sigma_{self.inference_config.gaussian_filter_blur_sigma}_checkpoint_{self.distilled_model_hash_folder}"
             )
             self.saved_dicts_folder = (
                 f"{self.experiment_folder_path}/"
                 f"image_per_patch_{self.inference_config.distance}_distances_"
-                f"distilled_model/"
+                f"distilled_model_checkpoint_{self.distilled_model_hash_folder}/"
             )
 
         self.save_cropped_borders_dict_folder = (
@@ -256,11 +258,19 @@ def main(*args, **kwargs):
         action="store_true",
         help="Enable anomaly map computation using the distillation model"
     )
+    parser.add_argument(
+        "--train_distilled_model_config_path",
+        default=None,
+        type=str,
+        help="Path to the training config of the distilled model which will be used for computing the anomaly maps"
+    )
+
     args = parser.parse_args()
 
     anomaly_maps_builder = AnomalyMapsBuilder(
         inference_config_path=args.inference_config_path,
-        use_distillation_model=args.use_distillation_model
+        use_distillation_model=args.use_distillation_model,
+        train_distilled_model_config_path=args.train_distilled_model_config_path
     )
     anomaly_maps_builder.run()
 

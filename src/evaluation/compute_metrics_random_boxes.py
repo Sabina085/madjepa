@@ -7,7 +7,7 @@ from src.utils.configs import *
 from src.utils.compute_metrics import compute_roc_auc_metrics
 
 class MetricsComputer:
-    def __init__(self, inference_config_path: str, weight_distillation: float=0.0):
+    def __init__(self, inference_config_path: str, train_distilled_model_config_path: str, weight_distillation: float=0.0):
         self.inference_config = read_inference_anomaly_detection_config(
             config_path=inference_config_path)
 
@@ -30,10 +30,11 @@ class MetricsComputer:
             f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
         )
 
+        self.distilled_model_hash_folder = train_distilled_model_config_path.split("/")[-2]
         self.anomaly_maps_distillation_arrays_path = (
             f"{self.experiment_folder_path}/"
             f"anomaly_maps_arrays_distillation_{self.inference_config.distance}_distance_"
-            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}_checkpoint_{self.distilled_model_hash_folder}"
         )
 
         self.metrics_folder = f"{self.experiment_folder_path}/Metrics"
@@ -93,7 +94,7 @@ class MetricsComputer:
             segmentation_paths=segmentation_paths,
             plot_probability_distribution_path=self.probability_distribution_plot_path,
             plot_roc_path=self.roc_plot_path,
-            weight_distillation=self.weight_distillation
+            weight_distillation=self.weight_distillation,
         )
         print('Image-level ROC-AUC: %.5f' % (roc_auc_metrics["image_roc_auc"]))
         print('Pixel-level ROC-AUC: %.5f' % (roc_auc_metrics["pixel_roc_auc"]))
@@ -111,6 +112,7 @@ class MetricsComputer:
                 "DISTANCE": [self.inference_config.distance],
                 "WEIGHT_DISTILLATION": [self.weight_distillation],
                 "EXPERIMENT_NAME": [self.inference_config.experiment_name],
+                "DISTILLED_MODEL_HASH": [self.distilled_model_hash_folder]
             }
         ) 
         metrics_df.to_csv(self.metrics_path, index=False)
@@ -119,12 +121,14 @@ class MetricsComputer:
 def main(*args, **kwargs):
     parser = argparse.ArgumentParser()
     parser.add_argument("--inference_config_path", type=str, help="Path to the inference config used for generating the anomaly maps.")
+    parser.add_argument("--train_distilled_model_config_path", type=str, help="Path to the training config of the distilled model which will be used for computing the results")
     parser.add_argument("--weight_distillation", type=float, default=0.0, help="Weight of the distillation anomaly map when computing the metrics.")
 
     args = parser.parse_args()
     metrics_computer = MetricsComputer(
         inference_config_path=args.inference_config_path,
-        weight_distillation=args.weight_distillation
+        train_distilled_model_config_path=args.train_distilled_model_config_path,
+        weight_distillation=float(args.weight_distillation),
     )
     metrics_computer.run()
 
