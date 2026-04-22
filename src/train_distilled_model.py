@@ -4,6 +4,7 @@ import json
 import hashlib
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from PIL import Image
 from pathlib import Path
@@ -234,8 +235,35 @@ class DistilledModelTrainer:
             }
         )
         loss_plot = sns.lineplot(loss_df, x="epoch", y="loss", hue="split")
-        fig = loss_plot.get_figure()
-        fig.savefig(loss_plot_path, dpi=300, bbox_inches='tight')
+        fig_loss = loss_plot.get_figure()
+        fig_loss.savefig(loss_plot_path, dpi=300, bbox_inches='tight')
+        plt.close(fig_loss)
+
+    @staticmethod
+    def _save_plot_filters(model, filters_plot_path: str, title: str, model_type: str = "student"):
+        if model_type == "student":
+            weights = model.embeddings.patch_embeddings.projection.weight
+        else:
+            # teacher model
+            weights = model.patch_embed.proj.weight
+        global_max = torch.max(weights).detach().cpu()
+        global_min = torch.min(weights).detach().cpu()
+
+        # Let's look at the first 16 filters (out of 384)
+        fig, axes = plt.subplots(4, 4, figsize=(8, 8))
+        for i, ax in enumerate(axes.flat):
+            # Permute from [C, H, W] to [H, W, C] for plotting
+            filter_img = weights[i].detach().cpu().permute(1, 2, 0)
+            # Normalize weights to [0, 1] for visualization
+            normalized_filter = (filter_img - global_min) / (global_max - global_min + 1e-8)
+            ax.imshow(normalized_filter)
+            ax.axis('off')
+            ax.set_title(f"Filter {i}")
+
+        fig.suptitle(title, fontsize=16)
+        plt.tight_layout()
+        fig.savefig(filters_plot_path)
+        plt.close(fig)
 
     def _save_results(self):
         distillation_model_path = os.path.join(self.distilled_model_folder_path, "student_model.pth")
@@ -247,7 +275,18 @@ class DistilledModelTrainer:
         trained_distillation_config_path = os.path.join(self.distilled_model_folder_path, "config.json")
         shutil.copy2(src=self.train_distillation_config_path, dst=trained_distillation_config_path)
 
+        # Save filters of the trained student model
+        filters_plot_path = os.path.join(self.distilled_model_folder_path, "trained_student_filters.png")
+        self._save_plot_filters(model=self.student_model, filters_plot_path=filters_plot_path, title="Trained student model")
+
     def run(self):
+        # Save the filters of the student model before training
+        untrained_student_filters_plot_path = os.path.join(self.distilled_model_folder_path, "before_training_student_filters.png")
+        self._save_plot_filters(model=self.student_model, filters_plot_path=untrained_student_filters_plot_path, title="Before training student model")
+        # Save the filters of the teacher model (for reference)
+        teacher_filters_plot_path = os.path.join(self.distilled_model_folder_path, "teacher_filters.png")
+        self._save_plot_filters(model=self.target_encoder, filters_plot_path=teacher_filters_plot_path, title="Teacher model", model_type="teacher")
+
         self._load_dataset()
         print(f"Started training for {self.train_distillation_config.num_epochs} epochs...")
 
