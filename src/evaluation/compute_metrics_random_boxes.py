@@ -46,6 +46,7 @@ class MetricsComputer:
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
             f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
             f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
+            f"_checkpoint_{self.distilled_model_hash_folder}"
             f"_distillation_weight_{self.weight_distillation}.csv"
         )
 
@@ -55,6 +56,7 @@ class MetricsComputer:
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
             f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
             f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
+            f"_checkpoint_{self.distilled_model_hash_folder}"
             f"_distillation_weight_{self.weight_distillation}.png"
         )
 
@@ -64,6 +66,7 @@ class MetricsComputer:
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
             f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
             f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
+            f"_checkpoint_{self.distilled_model_hash_folder}"
             f"_distillation_weight_{self.weight_distillation}.png"
         )
 
