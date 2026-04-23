@@ -208,6 +208,7 @@ class TrainDistillationConfig:
     peak_lr: float
     final_lr: float
     weight_decay: float
+    patience: int
 
 
 def read_train_distillation_config(config_path: str) -> TrainDistillationConfig:
@@ -230,5 +231,6 @@ def read_train_distillation_config(config_path: str) -> TrainDistillationConfig:
     config.peak_lr = float(yaml_dict["optimization"]["peak_lr"])
     config.final_lr = float(yaml_dict["optimization"]["final_lr"])
     config.weight_decay = float(yaml_dict["optimization"]["weight_decay"])
+    config.patience = int(yaml_dict["optimization"]["patience"])
 
     return config

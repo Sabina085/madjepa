@@ -295,6 +295,11 @@ class DistilledModelTrainer:
         valid_normal_loss_per_epoch = []
         valid_anomaly_normal_difference_loss_per_epoch = []
 
+        # for early stopping
+        best_valid_normal_loss = float("inf")
+        best_epoch = -1
+        adjusted_num_epochs = self.train_distillation_config.num_epochs
+
         for epoch in range(self.train_distillation_config.num_epochs):
             print('Epoch %d' % epoch)
             train_losses = []
@@ -374,12 +379,23 @@ class DistilledModelTrainer:
                 valid_normal_loss_per_epoch.append(avg_valid_loss_normal_crt_epoch)
                 valid_anomaly_normal_difference_loss_per_epoch.append(avg_difference_loss_anomaly_normal_crt_epoch)
 
+                # Early stopping
+                if avg_valid_loss_normal_crt_epoch < best_valid_normal_loss:
+                    best_valid_normal_loss = avg_valid_loss_normal_crt_epoch
+                    best_epoch = epoch
+                    print(f"Best new checkpoint epoch {epoch} -> saving...")
+                    self._save_results()
+
+                else:
+                    if (epoch - best_epoch) > self.train_distillation_config.patience:
+                        print(f"The validation loss on normal samples did not decrease in the last {self.train_distillation_config.patience}. Stopping the training.")
+                        adjusted_num_epochs = epoch + 1
+                        break
+     
             self.scheduler.step()
 
-        self._save_results()
-
         self._save_loss_plot(
-            num_epochs=self.train_distillation_config.num_epochs,
+            num_epochs=adjusted_num_epochs,
             train_loss_per_epoch=train_loss_per_epoch,
             valid_normal_loss_per_epoch=valid_normal_loss_per_epoch,
             valid_anomaly_loss_per_epoch=valid_anomaly_loss_per_epoch,
