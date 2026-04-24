@@ -1,0 +1,19 @@
+# Inference configuration for BraTS2021_slice dataset
+
+data:
+  dataset_name: "BraTS2021_slice"
+  experiment_name: "enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3_cropped_random_crop_training"
+  split: "valid"
+
+inference:
+  # How many random target boxes to sample per image
+  num_sampled_random_boxes_per_image: 30
+  distance: "l2"
+  aggregate_patches_strategy: "mean"
+  gaussian_filter_blur_sigma: 2
+  # For computing the image-level metrics
+  image_statistic_for_classification: "max"
+
+misc:
+  # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
+  save_images_with_masks: True

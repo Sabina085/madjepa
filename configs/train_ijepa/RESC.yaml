@@ -40,7 +40,7 @@ data:
   # the border of background pixels left in the input image after ROI cropping
   count_border_pixels: 10
 
-  image_folder: RESC/train/
+  image_folder: RESC/
   data_root_folder_path: /home/sabina/PhD/BMAD
   pin_mem: True
   num_workers: 10
@@ -72,7 +72,7 @@ mask:
 
 
 optimization:
-  num_epochs: 20
+  num_epochs: 40
   ema:
   - 0.996
   - 1.0
@@ -88,5 +88,5 @@ optimization:
 
 
 logging:
-  logging_folder: experiments_RESC/experiment_default_hyparams/logs/
-  write_tag: experiment_default_hyparams
+  logging_folder: experiments_RESC/experiment_default_hyparams_early_stopping/logs/
+  write_tag: experiment_default_hyparams_early_stopping

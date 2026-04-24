@@ -2,7 +2,7 @@
 
 data:
   dataset_name: "RESC"
-  experiment_name: "experiment_default_hyparams"
+  experiment_name: "experiment_default_hyparams_early_stopping"
   split: "valid"
 
 inference:

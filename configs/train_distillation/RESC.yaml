@@ -1,6 +1,6 @@
 data:
     dataset_name: RESC
-    experiment_name: experiment_default_hyparams
+    experiment_name: experiment_default_hyparams_early_stopping
 
 model:
     hidden_size: 384
@@ -16,3 +16,4 @@ optimization:
     peak_lr: 1e-3
     final_lr: 1e-5
     weight_decay: 0.05
+    patience: 10 # epochs

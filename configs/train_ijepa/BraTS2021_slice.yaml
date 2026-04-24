@@ -40,7 +40,7 @@ data:
   # the border of background pixels left in the input image after ROI cropping
   count_border_pixels: 2
   
-  image_folder: BraTS2021_slice/train/
+  image_folder: BraTS2021_slice/
   data_root_folder_path: /home/sabina/PhD/BMAD
   pin_mem: True
   num_workers: 10
@@ -72,7 +72,7 @@ mask:
 
 
 optimization:
-  num_epochs: 20
+  num_epochs: 40
   ema:
   - 0.996
   - 1.0
@@ -88,5 +88,5 @@ optimization:
 
 
 logging:
-  logging_folder: experiments_BraTS2021_slice/test_experiment/logs/
-  write_tag: test_experiment
+  logging_folder: experiments_BraTS2021_slice/experiment_early_stopping_40_epochs_2/logs/
+  write_tag: experiment_early_stopping_2

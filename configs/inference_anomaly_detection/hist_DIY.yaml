@@ -2,8 +2,8 @@
 
 data:
   dataset_name: "hist_DIY"
-  experiment_name: "experiment_default_hyparams"
-  split: "valid"
+  experiment_name: "experiment_default_hyparams_early_stopping"
+  split: "test"
 
 inference:
   # How many random target boxes to sample per image
