@@ -174,9 +174,12 @@ def main(*args, **kwargs):
     )
 
     # -- init data-loaders/samplers
+    train_image_folder = os.path.join(config.image_folder, "train")
+    valid_image_folder = os.path.join(config.image_folder, "valid/good/img")
+
     if "BraTS2021_slice" in config.image_folder:
         # Brain MRI dataset
-        _, unsupervised_loader, unsupervised_sampler = make_brain_mri(
+        _, train_unsupervised_loader, train_unsupervised_sampler = make_brain_mri(
                 transform=transform,
                 batch_size=config.batch_size,
                 collator=mask_collator,
@@ -185,12 +188,27 @@ def main(*args, **kwargs):
                 world_size=world_size,
                 rank=rank,
                 root_path=config.data_root_folder_path,
-                image_folder=config.image_folder,
-                drop_last=False
+                image_folder=train_image_folder,
+                drop_last=False,
+                is_train=True,
+        )
+
+        _, valid_unsupervised_loader, _ = make_brain_mri(
+                transform=transform,
+                batch_size=config.batch_size,
+                collator=mask_collator,
+                pin_mem=config.pin_mem,
+                num_workers=config.num_workers,
+                world_size=world_size,
+                rank=rank,
+                root_path=config.data_root_folder_path,
+                image_folder=valid_image_folder,
+                drop_last=False,
+                is_train=False,
         )
     elif "hist_DIY" in config.image_folder:
         # Liver CT dataset
-        _, unsupervised_loader, unsupervised_sampler = make_liver_ct(
+        _, train_unsupervised_loader, train_unsupervised_sampler = make_liver_ct(
                 transform=transform,
                 batch_size=config.batch_size,
                 collator=mask_collator,
@@ -199,12 +217,27 @@ def main(*args, **kwargs):
                 world_size=world_size,
                 rank=rank,
                 root_path=config.data_root_folder_path,
-                image_folder=config.image_folder,
-                drop_last=False
+                image_folder=train_image_folder,
+                drop_last=False,
+                is_train=True,
+        )
+
+        _, valid_unsupervised_loader, _ = make_liver_ct(
+                transform=transform,
+                batch_size=config.batch_size,
+                collator=mask_collator,
+                pin_mem=config.pin_mem,
+                num_workers=config.num_workers,
+                world_size=world_size,
+                rank=rank,
+                root_path=config.data_root_folder_path,
+                image_folder=valid_image_folder,
+                drop_last=False,
+                is_train=False,
         )
     elif "RESC" in config.image_folder:
         # RESC dataset
-        _, unsupervised_loader, unsupervised_sampler = make_resc(
+        _, train_unsupervised_loader, train_unsupervised_sampler = make_resc(
                 transform=transform,
                 batch_size=config.batch_size,
                 collator=mask_collator,
@@ -213,11 +246,29 @@ def main(*args, **kwargs):
                 world_size=world_size,
                 rank=rank,
                 root_path=config.data_root_folder_path,
-                image_folder=config.image_folder,
-                drop_last=False
-        )  
+                image_folder=train_image_folder,
+                drop_last=False,
+                is_train=True,
+        )
 
-    ipe = len(unsupervised_loader)
+        _, valid_unsupervised_loader, _ = make_resc(
+                transform=transform,
+                batch_size=config.batch_size,
+                collator=mask_collator,
+                pin_mem=config.pin_mem,
+                num_workers=config.num_workers,
+                world_size=world_size,
+                rank=rank,
+                root_path=config.data_root_folder_path,
+                image_folder=valid_image_folder,
+                drop_last=False,
+                is_train=False,
+        )
+
+    print("Train set = ", len(train_unsupervised_loader))
+    print("Validation set = ", len(valid_unsupervised_loader))
+
+    ipe = len(train_unsupervised_loader)
     print("Number of instances per epoch = ", ipe)
 
     # -- init optimizer and scheduler
@@ -294,23 +345,24 @@ def main(*args, **kwargs):
 
         if rank == 0:
             torch.save(save_dict, latest_path)
-            if epoch % checkpoint_freq == 0:
-                torch.save(save_dict, save_path.format(epoch=f'{epoch}'))
 
+    # For early stopping
+    best_valid_loss = float('inf')
+    best_epoch = 0
     # -- TRAINING LOOP
     print(f"Started training for {config.num_epochs} epochs...")
     for epoch in range(start_epoch, config.num_epochs):
         logger.info('Epoch %d' % (epoch + 1))
 
         # -- update distributed-data-loader epoch
-        unsupervised_sampler.set_epoch(epoch)
+        train_unsupervised_sampler.set_epoch(epoch)
 
         loss_meter = AverageMeter()
         maskA_meter = AverageMeter()
         maskB_meter = AverageMeter()
         time_meter = AverageMeter()
 
-        for itr, (udata, masks_enc, masks_pred) in enumerate(unsupervised_loader):
+        for itr, (udata, masks_enc, masks_pred) in enumerate(train_unsupervised_loader):
             def load_imgs():
                 # -- unsupervised imgs
                 imgs = udata[0].to(device, non_blocking=True)
@@ -401,15 +453,51 @@ def main(*args, **kwargs):
                                        grad_stats.last_layer,
                                        grad_stats.min,
                                        grad_stats.max))
+            
+            with torch.no_grad():
+                log_stats()
+                assert not np.isnan(loss), 'loss is nan'
+                
 
-            log_stats()
+        with torch.inference_mode():
+            valid_losses = []
 
-            assert not np.isnan(loss), 'loss is nan'
-            torch.cuda.empty_cache()
+            for valid_itr, (valid_udata, valid_masks_enc, valid_masks_pred) in enumerate(valid_unsupervised_loader):
+                valid_imgs = valid_udata.to(device, non_blocking=True)
+                valid_masks_enc = [u.to(device, non_blocking=True) for u in valid_masks_enc]
+                valid_masks_pred = [u.to(device, non_blocking=True) for u in valid_masks_pred]
+
+                h_valid = target_encoder.forward(valid_imgs)
+                # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
+                # h = F.layer_norm(h, (h.size(-1),))  # normalize over feature-dim
+                B = len(h_valid)
+
+                # -- create targets (masked regions of h)
+                h_valid = apply_masks(h_valid, valid_masks_pred)
+                h_valid = repeat_interleave_batch(h_valid, B, repeat=len(valid_masks_enc))
+
+                z_valid = encoder.forward(valid_imgs, valid_masks_enc)
+                z_valid = predictor.forward(z_valid, valid_masks_enc, valid_masks_pred)
+                
+                valid_loss = F.smooth_l1_loss(z_valid, h_valid)
+                valid_loss = valid_loss.cpu().numpy()
+                
+                valid_losses.append(valid_loss)
 
         # -- Save Checkpoint after every epoch
-        logger.info('avg. loss %.3f' % loss_meter.avg)
-        save_checkpoint(epoch + 1)
+        avg_valid_loss_epoch = np.mean(valid_losses)
+        logger.info(f"avg. validation loss {avg_valid_loss_epoch}, epoch {epoch + 1}")
+        if avg_valid_loss_epoch < best_valid_loss:
+            best_valid_loss = avg_valid_loss_epoch
+            best_epoch = epoch
+            print(f"Saving the checkpoint at {latest_path}")
+            save_checkpoint(epoch + 1)
+        else:
+            if epoch - best_epoch > 5: # TODO: make the patience configurable
+                logger.info(f"The validation loss did not decrease in the last 5 epochs. Stopping the training.")
+                break
+
+        torch.cuda.empty_cache()
 
     if torch.distributed.is_initialized():
         torch.distributed.destroy_process_group()
