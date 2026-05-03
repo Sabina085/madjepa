@@ -52,6 +52,7 @@ class TrainIjepaConfig():
 
     # --- optimization
     num_epochs: int
+    patience: int
     ema: Tuple[float, float]
     ipe_scale: float
     lr: float
@@ -130,6 +131,7 @@ def read_train_ijepa_config(config_path: str) -> TrainIjepaConfig:
 
     # --- optimization
     config.num_epochs = config_dict["optimization"]["num_epochs"]
+    config.patience = config_dict["optimization"]["patience"]
     config.ema = config_dict["optimization"]["ema"]
     config.ipe_scale = config_dict["optimization"]["ipe_scale"]  # scheduler scale factor (def: 1.0)
     config.lr = config_dict["optimization"]["lr"]

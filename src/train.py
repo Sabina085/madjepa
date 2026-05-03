@@ -493,8 +493,8 @@ def main(*args, **kwargs):
             print(f"Saving the checkpoint at {latest_path}")
             save_checkpoint(epoch + 1)
         else:
-            if epoch - best_epoch > 5: # TODO: make the patience configurable
-                logger.info(f"The validation loss did not decrease in the last 5 epochs. Stopping the training.")
+            if epoch - best_epoch > config.patience:
+                logger.info(f"The validation loss did not decrease in the last {config.patience} epochs. Stopping the training.")
                 break
 
         torch.cuda.empty_cache()
