@@ -484,7 +484,8 @@ def main(*args, **kwargs):
                 
                 valid_losses.append(valid_loss)
 
-        # -- Save Checkpoint after every epoch
+        # -- Save the checkpoint if the validation loss (on normal samples) is lower than for the previous checkpoint
+        # -- Early stopping if the validation loss (on normal samples) did not decrease in the last {patience} epochs
         avg_valid_loss_epoch = np.mean(valid_losses)
         logger.info(f"avg. validation loss {avg_valid_loss_epoch}, epoch {epoch + 1}")
         if avg_valid_loss_epoch < best_valid_loss:
