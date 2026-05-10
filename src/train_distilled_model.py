@@ -21,9 +21,11 @@ from src.helper import (
     init_model_dinov3
 )
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
+import torch.nn.functional as F
 from transformers import ViTConfig, ViTModel
 
-STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD"
+# STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD"
+STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset"
 
 class DistilledModelTrainer:
     def __init__(self, train_distillation_config_path: str):
@@ -43,8 +45,14 @@ class DistilledModelTrainer:
         root_directory_path = os.path.join(*subpath_list[:-1])
         current_dir = subpath_list[-1]
 
+        # self.experiment_folder_path = (
+        #     f"/{root_directory_path}/{current_dir}/"
+        #     f"experiments_{self.train_distillation_config.dataset_name}/"
+        #     f"{self.train_distillation_config.experiment_name}"
+        # )
+
         self.experiment_folder_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
             f"experiments_{self.train_distillation_config.dataset_name}/"
             f"{self.train_distillation_config.experiment_name}"
         )
@@ -66,13 +74,19 @@ class DistilledModelTrainer:
         json_train_distillation_config_sorted = json.dumps(vars(self.train_distillation_config), sort_keys=True)
         self.distillation_config_hash = hashlib.sha256(json.dumps(json_train_distillation_config_sorted).encode()).hexdigest()[: 16]
 
+        # self.distilled_model_folder_path = (
+        #     f"/{root_directory_path}/{current_dir}/"
+        #     f"experiments_{self.train_distillation_config.dataset_name}/"
+        #     f"{self.train_distillation_config.experiment_name}/checkpoints_distilled_model/{self.distillation_config_hash}"
+        # )
+
         self.distilled_model_folder_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
             f"experiments_{self.train_distillation_config.dataset_name}/"
             f"{self.train_distillation_config.experiment_name}/checkpoints_distilled_model/{self.distillation_config_hash}"
         )
 
-        os.makedirs(self.distilled_model_folder_path, exist_ok=True)
+        os.makedirs(self.distilled_model_folder_path, exist_ok=False)
 
     def _load_dataset(self):
         train_dataset_path = f"{STORAGE_PARENT_FOLDER_PATH}/{self.train_distillation_config.dataset_name}/train"
@@ -181,6 +195,18 @@ class DistilledModelTrainer:
         )
 
         self.target_encoder = loaded_dict_from_checkpoint["target_encoder"]
+
+    def _loss_fn(self, student, teacher):
+        # student, teacher: [B, N_patches, 384]
+        student_norm = F.normalize(student, dim=-1)  # normalize each patch vector independently
+        teacher_norm = F.normalize(teacher, dim=-1)
+        return self.criterion(student_norm, teacher_norm)
+    
+    def _loss_fn_valid(self, student, teacher):
+        # student, teacher: [B, N_patches, 384]
+        student_norm = F.normalize(student, dim=-1)  # normalize each patch vector independently
+        teacher_norm = F.normalize(teacher, dim=-1)
+        return self.valid_criterion(student_norm, teacher_norm)
 
     def _set_optimization_configuration(self):
         # Freeze the target encoder weights
@@ -319,7 +345,7 @@ class DistilledModelTrainer:
                 assert target_encoder_emb.shape == student_emb.shape
 
                 self.optimizer.zero_grad()
-                loss = self.criterion(student_emb, target_encoder_emb)
+                loss = self._loss_fn(student=student_emb, teacher=target_encoder_emb)
                 loss.backward()
                 self.optimizer.step()
 
@@ -328,6 +354,12 @@ class DistilledModelTrainer:
                     train_losses.append(loss_value)
                     if train_batch_idx % 20 == 0:
                         print(f"Train loss batch index {train_batch_idx}: {loss_value}")
+        
+                    s_norm = student_emb.norm(dim=-1).mean()
+                    t_norm = target_encoder_emb.norm(dim=-1).mean()
+                    # print(f"Student norm: {s_norm:.3f} | Teacher norm: {t_norm:.3f}")
+                    # print(student_emb.shape)          # should be [B, 196, 384]
+                    # print(target_encoder_emb.shape)   # should be [B, 196, 384]
 
             avg_train_loss_crt_epoch = np.mean(train_losses)
             train_loss_per_epoch.append(avg_train_loss_crt_epoch)
@@ -351,7 +383,7 @@ class DistilledModelTrainer:
 
                         assert target_encoder_emb.shape == student_emb.shape
 
-                        valid_loss = self.valid_criterion(student_emb, target_encoder_emb).detach().cpu().numpy()
+                        valid_loss = self._loss_fn_valid(student=student_emb, teacher=target_encoder_emb).detach().cpu().numpy()
                         label_arr = label.detach().cpu().numpy()
 
                         anomaly_indices = np.where(label_arr == 1)[0]

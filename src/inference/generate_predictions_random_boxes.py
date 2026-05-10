@@ -20,7 +20,9 @@ from src.masks.utils import apply_masks
 from src.utils.tensors import repeat_interleave_batch
 from src.masks.multiblock import MaskCollator
 
-STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
+# STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
+STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
+
 
 class PredictionsRandomBoxesGenerator:
     def __init__(self, inference_config_path: str):
@@ -36,15 +38,28 @@ class PredictionsRandomBoxesGenerator:
             f"{self.inference_config.dataset_name}/{self.inference_config.split}"
         )
 
+        # self.experiment_folder_path = (
+        #     f"/{root_directory_path}/{current_dir}/"
+        #     f"experiments_{self.inference_config.dataset_name}/"
+        #     f"{self.inference_config.experiment_name}/"
+        #     f"results_{self.inference_config.split}"
+        # )
+
         self.experiment_folder_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/"
             f"results_{self.inference_config.split}"
         )
 
+        # self.train_config_path = (
+        #     f"/{root_directory_path}/{current_dir}/"
+        #     f"experiments_{self.inference_config.dataset_name}/"
+        #     f"{self.inference_config.experiment_name}/logs/config_run.yaml"
+        # )
+
         self.train_config_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/logs/config_run.yaml"
         )

@@ -1,8 +1,10 @@
 import sys
-sys.path.append("/home/sabina/PhD/IJepa-AD/ijepa-anomaly-detection")
+# sys.path.append("/home/sabina/PhD/IJepa-AD/ijepa-anomaly-detection")
+sys.path.append("/home/vhondru/istoian/ijepa-anomaly-detection")
 
 import os
-os.chdir("/home/sabina/PhD/IJepa-AD/ijepa-anomaly-detection")
+# os.chdir("/home/sabina/PhD/IJepa-AD/ijepa-anomaly-detection")
+os.chdir("/home/vhondru/istoian/ijepa-anomaly-detection")
 
 import torch
 import os
@@ -22,7 +24,9 @@ from src.utils.preprocessing import *
 from src.utils.dataset import *
 
 
-STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
+# STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
+STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
+
 
 class PredictionsDistilledModelGenerator:
     def __init__(
@@ -39,8 +43,14 @@ class PredictionsDistilledModelGenerator:
         root_directory_path = os.path.join(*subpath_list[:-1])
         current_dir = subpath_list[-1]
 
+        # self.experiment_folder_path = (
+        #     f"/{root_directory_path}/{current_dir}/"
+        #     f"experiments_{self.inference_anomaly_detection_config.dataset_name}/"
+        #     f"{self.inference_anomaly_detection_config.experiment_name}"
+        # )
+
         self.experiment_folder_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
             f"experiments_{self.inference_anomaly_detection_config.dataset_name}/"
             f"{self.inference_anomaly_detection_config.experiment_name}"
         )
@@ -197,6 +207,10 @@ class PredictionsDistilledModelGenerator:
                     student_emb = student_model(image).last_hidden_state[:, 1: , :]
 
                     assert target_encoder_emb.shape == student_emb.shape
+
+                    target_encoder_emb = F.norm(target_encoder_emb, dim=-1)
+                    student_emb = F.norm(student_emb, dim=-1)
+
 
                     # --- Compute the metrics
                     # Average distance between the predicted and target patch-level representations (embeddings) for the random box

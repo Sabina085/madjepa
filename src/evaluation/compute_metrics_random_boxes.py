@@ -16,12 +16,18 @@ class MetricsComputer:
         current_dir = subpath_list[-1]
         self.weight_distillation = weight_distillation
 
+        # self.experiment_folder_path = (
+        #     f"/{root_directory_path}/{current_dir}/"
+        #     f"experiments_{self.inference_config.dataset_name}/"
+        #     f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
+        # )
+
         self.experiment_folder_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
         )
-
+        
         self.anomaly_maps_arrays_path = (
             f"{self.experiment_folder_path}/"
             f"anomaly_maps_arrays_{self.inference_config.distance}_distance_"

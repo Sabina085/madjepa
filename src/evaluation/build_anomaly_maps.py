@@ -12,8 +12,8 @@ from src.utils.inference import *
 from src.utils.configs import *
 from src.utils.anomaly_maps import *
 
-STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
-
+# STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
+STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
 
 class AnomalyMapsBuilder:
     def __init__(self, inference_config_path: str, use_distillation_model: bool=False, train_distilled_model_config_path: str=None):
@@ -26,14 +26,26 @@ class AnomalyMapsBuilder:
         self.evaluation_dataset_path = (f"{STORAGE_PARENT_FOLDER_PATH}"
                                         f"{self.inference_config.dataset_name}/{self.inference_config.split}")
         
+        # self.experiment_folder_path = (
+        #     f"/{root_directory_path}/{current_dir}/"
+        #     f"experiments_{self.inference_config.dataset_name}/"
+        #     f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
+        # )
+
         self.experiment_folder_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
         )
 
+        # self.train_config_path = (
+        #     f"/{root_directory_path}/{current_dir}/"
+        #     f"experiments_{self.inference_config.dataset_name}/"
+        #     f"{self.inference_config.experiment_name}/logs/config_run.yaml"
+        # )
+
         self.train_config_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/logs/config_run.yaml"
         )
