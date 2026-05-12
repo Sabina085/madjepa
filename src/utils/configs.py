@@ -61,6 +61,8 @@ class TrainIjepaConfig():
     warmup: float
     wd: float
     final_wd: float
+    encoder_mlp_dropout: float
+    predictor_mlp_dropout: float
     
     # --- logging 
     logging_folder: str
@@ -140,6 +142,8 @@ def read_train_ijepa_config(config_path: str) -> TrainIjepaConfig:
     config.warmup = config_dict["optimization"]["warmup"]
     config.wd = config_dict["optimization"]["weight_decay"]
     config.final_wd = config_dict["optimization"]["final_weight_decay"]
+    config.encoder_mlp_dropout = config_dict["optimization"]["encoder_mlp_dropout"]
+    config.predictor_mlp_dropout = config_dict["optimization"]["predictor_mlp_dropout"]
 
     # -- logging
     config.logging_folder = config_dict["logging"]["logging_folder"]
@@ -211,6 +215,7 @@ class TrainDistillationConfig:
     final_lr: float
     weight_decay: float
     patience: int
+    hidden_dropout_prob: float
 
 
 def read_train_distillation_config(config_path: str) -> TrainDistillationConfig:
@@ -234,5 +239,6 @@ def read_train_distillation_config(config_path: str) -> TrainDistillationConfig:
     config.final_lr = float(yaml_dict["optimization"]["final_lr"])
     config.weight_decay = float(yaml_dict["optimization"]["weight_decay"])
     config.patience = int(yaml_dict["optimization"]["patience"])
+    config.hidden_dropout_prob = float(yaml_dict["optimization"]["hidden_dropout_prob"])
 
     return config

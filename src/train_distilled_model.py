@@ -198,14 +198,18 @@ class DistilledModelTrainer:
 
     def _loss_fn(self, student, teacher):
         # student, teacher: [B, N_patches, 384]
+        assert student.shape == teacher.shape
+
         student_norm = F.normalize(student, dim=-1)  # normalize each patch vector independently
         teacher_norm = F.normalize(teacher, dim=-1)
+        
         return self.criterion(student_norm, teacher_norm)
     
     def _loss_fn_valid(self, student, teacher):
         # student, teacher: [B, N_patches, 384]
         student_norm = F.normalize(student, dim=-1)  # normalize each patch vector independently
         teacher_norm = F.normalize(teacher, dim=-1)
+
         return self.valid_criterion(student_norm, teacher_norm)
 
     def _set_optimization_configuration(self):
@@ -222,9 +226,12 @@ class DistilledModelTrainer:
         )
         self.criterion = torch.nn.MSELoss()
         self.valid_criterion = torch.nn.MSELoss(reduction="none")
+        
+        # self.criterion = torch.nn.SmoothL1Loss()
+        # self.valid_criterion = torch.nn.SmoothL1Loss(reduction="none")
 
         # Learning rate schedulers
-        # Phase 1: Linear Warmup -> from 1e-6 (START_LR) up to 1e-3 (PEAK_LR)
+        # Phase 1: Linear Warmup -> from START_LR up to PEAK_LR
         self.warmup_sched = LinearLR(
             self.optimizer, 
             start_factor=self.train_distillation_config.start_lr / self.train_distillation_config.peak_lr, 
@@ -338,9 +345,11 @@ class DistilledModelTrainer:
                 with torch.no_grad():
                     # --- Target encoder forward prop
                     target_encoder_emb = self.target_encoder(image)
+                    # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
 
                 # [CLS] token -> position 0; 
                 student_emb = self.student_model(image).last_hidden_state[:, 1: , :]
+                # student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
 
                 assert target_encoder_emb.shape == student_emb.shape
 
@@ -355,11 +364,13 @@ class DistilledModelTrainer:
                     if train_batch_idx % 20 == 0:
                         print(f"Train loss batch index {train_batch_idx}: {loss_value}")
         
-                    s_norm = student_emb.norm(dim=-1).mean()
-                    t_norm = target_encoder_emb.norm(dim=-1).mean()
-                    # print(f"Student norm: {s_norm:.3f} | Teacher norm: {t_norm:.3f}")
-                    # print(student_emb.shape)          # should be [B, 196, 384]
-                    # print(target_encoder_emb.shape)   # should be [B, 196, 384]
+                    if train_batch_idx % 20 == 0:
+                        s_norm = student_emb.detach().norm(dim=-1).mean()
+                        t_norm = target_encoder_emb.detach().norm(dim=-1).mean()
+                        print(f"Batch {train_batch_idx} -> Student norm: {s_norm:.3f} | Teacher norm: {t_norm:.3f}")
+
+                        cos_sim = F.cosine_similarity(student_emb.detach(), target_encoder_emb.detach(), dim=-1).mean()
+                        print(f"Batch {train_batch_idx} -> Cosine similarity: {cos_sim:.3f}")
 
             avg_train_loss_crt_epoch = np.mean(train_losses)
             train_loss_per_epoch.append(avg_train_loss_crt_epoch)
@@ -379,7 +390,9 @@ class DistilledModelTrainer:
                     with torch.no_grad():
                         # --- Target encoder forward prop
                         target_encoder_emb = self.target_encoder(image)
+                        # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
                         student_emb = self.student_model(image).last_hidden_state[:, 1: , :]
+                        # student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
 
                         assert target_encoder_emb.shape == student_emb.shape
 

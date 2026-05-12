@@ -119,6 +119,11 @@ def load_models_from_checkpoint(
         "epoch": epoch
     }
 
+# Set dropout on all existing Dropout modules
+def set_dropout(model, drop_rate=0.1):
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.Dropout) and "mlp" in name:
+            module.p = drop_rate
 
 def init_model_dinov3(
         device: str,
@@ -130,7 +135,10 @@ def init_model_dinov3(
         predictor_depth: int,
         predictor_num_heads: int,
         target_encoder_model_name: str,
-        target_encoder_weights_path: str) -> Dict[str, object]:
+        target_encoder_weights_path: str,
+        encoder_mlp_dropout: float = 0.0,
+        predictor_mlp_dropout: float = 0.0
+    ) -> Dict[str, object]:
     
     
     assert encoder_model_name == target_encoder_model_name, "Both the encoder and the target encoder should have the same architecture"
@@ -147,6 +155,8 @@ def init_model_dinov3(
         weights=encoder_weights_path
     )
     encoder.to(device=device)
+
+    set_dropout(model=encoder, drop_rate=encoder_mlp_dropout)
     logger.info(f'Correctly initialized pretrained encoder (DinoV3 checkpoint)!')
 
     # -- Initializing predictor
@@ -156,7 +166,8 @@ def init_model_dinov3(
         embed_dim=encoder_embed_dim, # embedding dimension of the encoder
         predictor_embed_dim=predictor_embed_dim, # embedding dimension of the predictor
         depth=predictor_depth,
-        num_heads=predictor_num_heads
+        num_heads=predictor_num_heads,
+        drop_rate=predictor_mlp_dropout
     )
     for m in predictor.modules():
         init_weights(m)

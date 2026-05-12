@@ -8,6 +8,7 @@ from PIL import Image
 from pathlib import Path
 
 from torchvision import transforms
+import torch.nn.functional as F
 
 from src.utils.inference import *
 from src.utils.dataset import *

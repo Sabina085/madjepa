@@ -137,7 +137,9 @@ def main(*args, **kwargs):
             predictor_num_patches=(config.crop_size // config.patch_size) * (config.crop_size // config.patch_size),
             predictor_num_heads=config.predictor_num_heads,
             target_encoder_model_name = config.target_encoder_model_name,
-            target_encoder_weights_path = config.target_encoder_weights_source
+            target_encoder_weights_path = config.target_encoder_weights_source,
+            encoder_mlp_dropout = config.encoder_mlp_dropout,
+            predictor_mlp_dropout = config.predictor_mlp_dropout
         )
         encoder = dict_init_models["encoder"]
         predictor = dict_init_models["predictor"]
@@ -317,7 +319,13 @@ def main(*args, **kwargs):
             mask_collator.step()
 
     encoder = DistributedDataParallel(encoder, static_graph=True)
+    for p in encoder.parameters():
+        p.requires_grad = True
+
     predictor = DistributedDataParallel(predictor, static_graph=True)
+    for p in predictor.parameters():
+        p.requires_grad = True
+
     target_encoder = DistributedDataParallel(target_encoder)
     for p in target_encoder.parameters():
         p.requires_grad = False
@@ -361,6 +369,10 @@ def main(*args, **kwargs):
         maskA_meter = AverageMeter()
         maskB_meter = AverageMeter()
         time_meter = AverageMeter()
+
+        encoder.train()
+        predictor.train()
+        target_encoder.eval()
 
         for itr, (udata, masks_enc, masks_pred) in enumerate(train_unsupervised_loader):
             def load_imgs():
@@ -459,6 +471,9 @@ def main(*args, **kwargs):
                 assert not np.isnan(loss), 'loss is nan'
                 
 
+        encoder.eval()
+        predictor.eval()
+        target_encoder.eval()
         with torch.inference_mode():
             valid_losses = []
 
@@ -469,7 +484,7 @@ def main(*args, **kwargs):
 
                 h_valid = target_encoder.forward(valid_imgs)
                 # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
-                # h = F.layer_norm(h, (h.size(-1),))  # normalize over feature-dim
+                # h_valid = F.layer_norm(h_valid, (h_valid.size(-1),))  # normalize over feature-dim
                 B = len(h_valid)
 
                 # -- create targets (masked regions of h)
@@ -494,7 +509,7 @@ def main(*args, **kwargs):
             print(f"Saving the checkpoint at {latest_path}")
             save_checkpoint(epoch + 1)
         else:
-            if epoch - best_epoch > config.patience:
+            if epoch - best_epoch >= config.patience:
                 logger.info(f"The validation loss did not decrease in the last {config.patience} epochs. Stopping the training.")
                 break
 

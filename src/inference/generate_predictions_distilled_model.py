@@ -12,6 +12,7 @@ import glob
 import json
 import argparse
 from torchvision import transforms
+import torch.nn.functional as F
 
 from src.utils.configs import *
 from transformers import ViTConfig, ViTModel
@@ -203,14 +204,14 @@ class PredictionsDistilledModelGenerator:
                 with torch.no_grad():
                     # --- Target encoder (teacher) forward prop
                     target_encoder_emb = target_encoder(image)
+                    # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
                     # --- Student model forward prop
                     student_emb = student_model(image).last_hidden_state[:, 1: , :]
 
                     assert target_encoder_emb.shape == student_emb.shape
 
-                    target_encoder_emb = F.norm(target_encoder_emb, dim=-1)
-                    student_emb = F.norm(student_emb, dim=-1)
-
+                    target_encoder_emb = F.normalize(target_encoder_emb, dim=-1)
+                    student_emb = F.normalize(student_emb, dim=-1)
 
                     # --- Compute the metrics
                     # Average distance between the predicted and target patch-level representations (embeddings) for the random box
