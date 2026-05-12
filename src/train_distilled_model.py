@@ -161,7 +161,8 @@ class DistilledModelTrainer:
             hidden_size=self.train_distillation_config.hidden_size,
             num_hidden_layers=self.train_distillation_config.num_hidden_layers,
             num_attention_heads=self.train_distillation_config.num_attention_heads,
-            intermediate_size=self.train_distillation_config.intermediate_size
+            intermediate_size=self.train_distillation_config.intermediate_size,
+            hidden_dropout_prob=self.train_distillation_config.hidden_dropout_prob,
         )
 
         # Initializing a VIT model with random weights
