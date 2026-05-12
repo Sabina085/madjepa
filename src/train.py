@@ -393,7 +393,7 @@ def main(*args, **kwargs):
                     with torch.no_grad():
                         h = target_encoder.forward(imgs)
                         # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
-                        # h = F.layer_norm(h, (h.size(-1),))  # normalize over feature-dim
+                        h = F.layer_norm(h, (h.size(-1),))  # normalize over feature-dim
                         B = len(h)
                         # -- create targets (masked regions of h)
                         h = apply_masks(h, masks_pred)
@@ -484,7 +484,7 @@ def main(*args, **kwargs):
 
                 h_valid = target_encoder.forward(valid_imgs)
                 # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
-                # h_valid = F.layer_norm(h_valid, (h_valid.size(-1),))  # normalize over feature-dim
+                h_valid = F.layer_norm(h_valid, (h_valid.size(-1),))  # normalize over feature-dim
                 B = len(h_valid)
 
                 # -- create targets (masked regions of h)

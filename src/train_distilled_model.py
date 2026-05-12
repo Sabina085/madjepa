@@ -302,6 +302,7 @@ class DistilledModelTrainer:
     def _save_results(self):
         distillation_model_path = os.path.join(self.distilled_model_folder_path, "student_model.pth")
         torch.save(self.student_model.state_dict(), distillation_model_path)
+        print(f"Saved model to: {distillation_model_path}")
 
         distillation_optimizer_path = os.path.join(self.distilled_model_folder_path, "optimizer.pth")
         torch.save(self.optimizer.state_dict(), distillation_optimizer_path)
@@ -335,7 +336,7 @@ class DistilledModelTrainer:
         adjusted_num_epochs = self.train_distillation_config.num_epochs
 
         for epoch in range(self.train_distillation_config.num_epochs):
-            print('Epoch %d' % epoch)
+            print('\nEpoch %d' % epoch)
             train_losses = []
 
             self.student_model.train()
@@ -346,11 +347,11 @@ class DistilledModelTrainer:
                 with torch.no_grad():
                     # --- Target encoder forward prop
                     target_encoder_emb = self.target_encoder(image)
-                    # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                    target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
 
                 # [CLS] token -> position 0; 
                 student_emb = self.student_model(image).last_hidden_state[:, 1: , :]
-                # student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
+                student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
 
                 assert target_encoder_emb.shape == student_emb.shape
 
@@ -373,6 +374,17 @@ class DistilledModelTrainer:
                         cos_sim = F.cosine_similarity(student_emb.detach(), target_encoder_emb.detach(), dim=-1).mean()
                         print(f"Batch {train_batch_idx} -> Cosine similarity: {cos_sim:.3f}")
 
+                        grads = []
+                        for name, param in self.student_model.named_parameters():
+                            if param.grad is not None:
+                                grads.append((name, param.grad.detach()))
+                        
+                        min_grad = min([grad[1].abs().mean().item() for grad in grads])
+                        max_grad = max([grad[1].abs().mean().item() for grad in grads])
+                        print(f"(min grad: {min_grad:.6f}, max grad: {max_grad:.6f})")
+                        print(f"{grads[2][0]}, {grads[2][1].abs().mean().item():.6f}")
+                        print(f"{grads[-8][0]}, {grads[-8][1].abs().mean().item():.6f}")
+                        print(f"{grads[-2][0]}, {grads[-2][1].abs().mean().item():.6f}")
             avg_train_loss_crt_epoch = np.mean(train_losses)
             train_loss_per_epoch.append(avg_train_loss_crt_epoch)
             print(f"Average train loss epoch {epoch} = {avg_train_loss_crt_epoch}")
@@ -385,23 +397,23 @@ class DistilledModelTrainer:
                 valid_losses_anomaly = []
                 valid_losses_normal = []
 
-                for valid_batch_idx, (image, label, _, _) in enumerate(self.valid_loader):
-                    image = image.to(self.device)
+                for valid_batch_idx, (valid_image, valid_label, _, _) in enumerate(self.valid_loader):
+                    valid_image = valid_image.to(self.device)
 
                     with torch.no_grad():
                         # --- Target encoder forward prop
-                        target_encoder_emb = self.target_encoder(image)
-                        # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
-                        student_emb = self.student_model(image).last_hidden_state[:, 1: , :]
-                        # student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
+                        valid_target_encoder_emb = self.target_encoder(valid_image)
+                        valid_target_encoder_emb = F.layer_norm(valid_target_encoder_emb, (valid_target_encoder_emb.size(-1),))  # normalize over feature-dim
+                        valid_student_emb = self.student_model(valid_image).last_hidden_state[:, 1: , :]
+                        valid_student_emb = F.layer_norm(valid_student_emb, (valid_student_emb.size(-1),))  # normalize over feature-dim
 
-                        assert target_encoder_emb.shape == student_emb.shape
+                        assert valid_target_encoder_emb.shape == valid_student_emb.shape
 
-                        valid_loss = self._loss_fn_valid(student=student_emb, teacher=target_encoder_emb).detach().cpu().numpy()
-                        label_arr = label.detach().cpu().numpy()
+                        valid_loss = self._loss_fn_valid(student=valid_student_emb, teacher=valid_target_encoder_emb).detach().cpu().numpy()
+                        valid_label_arr = valid_label.detach().cpu().numpy()
 
-                        anomaly_indices = np.where(label_arr == 1)[0]
-                        normal_indices = np.where(label_arr == 0)[0]
+                        anomaly_indices = np.where(valid_label_arr == 1)[0]
+                        normal_indices = np.where(valid_label_arr == 0)[0]
 
                         if len(anomaly_indices) > 0:
                             valid_loss_anomaly = valid_loss[anomaly_indices].mean(axis=(1, 2))
@@ -433,7 +445,7 @@ class DistilledModelTrainer:
                     self._save_results()
 
                 else:
-                    if (epoch - best_epoch) > self.train_distillation_config.patience:
+                    if (epoch - best_epoch) >= self.train_distillation_config.patience:
                         print(f"The validation loss on normal samples did not decrease in the last {self.train_distillation_config.patience}. Stopping the training.")
                         adjusted_num_epochs = epoch + 1
                         break
