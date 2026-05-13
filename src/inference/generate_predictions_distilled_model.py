@@ -204,9 +204,10 @@ class PredictionsDistilledModelGenerator:
                 with torch.no_grad():
                     # --- Target encoder (teacher) forward prop
                     target_encoder_emb = target_encoder(image)
-                    # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                    target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
                     # --- Student model forward prop
                     student_emb = student_model(image).last_hidden_state[:, 1: , :]
+                    student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
 
                     assert target_encoder_emb.shape == student_emb.shape
 
