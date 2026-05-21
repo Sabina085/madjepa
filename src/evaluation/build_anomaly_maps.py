@@ -12,8 +12,8 @@ from src.utils.inference import *
 from src.utils.configs import *
 from src.utils.anomaly_maps import *
 
-# STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
-STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
+STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
+# STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
 
 class AnomalyMapsBuilder:
     def __init__(self, inference_config_path: str, use_distillation_model: bool=False, train_distilled_model_config_path: str=None):
@@ -26,29 +26,29 @@ class AnomalyMapsBuilder:
         self.evaluation_dataset_path = (f"{STORAGE_PARENT_FOLDER_PATH}"
                                         f"{self.inference_config.dataset_name}/{self.inference_config.split}")
         
-        # self.experiment_folder_path = (
-        #     f"/{root_directory_path}/{current_dir}/"
-        #     f"experiments_{self.inference_config.dataset_name}/"
-        #     f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
-        # )
-
         self.experiment_folder_path = (
-            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
+            f"/{root_directory_path}/{current_dir}/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
         )
 
-        # self.train_config_path = (
-        #     f"/{root_directory_path}/{current_dir}/"
+        # self.experiment_folder_path = (
+        #     f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
         #     f"experiments_{self.inference_config.dataset_name}/"
-        #     f"{self.inference_config.experiment_name}/logs/config_run.yaml"
+        #     f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
         # )
 
         self.train_config_path = (
-            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
+            f"/{root_directory_path}/{current_dir}/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/logs/config_run.yaml"
         )
+
+        # self.train_config_path = (
+        #     f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
+        #     f"experiments_{self.inference_config.dataset_name}/"
+        #     f"{self.inference_config.experiment_name}/logs/config_run.yaml"
+        # )
 
         # Read the ijepa training configuration file (which was used for training the checkpoint)
         self.train_config = read_train_ijepa_config(config_path=self.train_config_path)
@@ -124,7 +124,6 @@ class AnomalyMapsBuilder:
             with open(saved_borders_dict_path, "r") as f:
                 borders_dict = json.load(f)
 
-            
             anomaly_map = build_anomaly_map_with_borders(
                 per_patch_distances_dict=distance_dict,
                 patch_size=self.train_config.patch_size,
@@ -177,36 +176,37 @@ class AnomalyMapsBuilder:
         heatmap = cv2.addWeighted(scaled_anomaly_map, 0.4, initial_image, (1 - 0.4), 0)
         cv2.imwrite(f"{self.anomaly_maps_images_path}/{image_name}_heatmap.png", heatmap)
 
-        # We are saving in the same folder the ground-truth segmentation mask for comparing it with the generated anomaly map
-        source_segmentation_mask_path = os.path.join(
-            self.evaluation_dataset_path,
-            label_subpath,
-            "label",
-            image_name + ".png"
-        )
-        segmentation_image = Image.open(source_segmentation_mask_path).convert("L")
-        segmentation_arr = np.array(segmentation_image)
+        if self.inference_config.dataset_name in ["BraTS2021_slice", "hist_DIY", "RESC"]:
+            # We are saving in the same folder the ground-truth segmentation mask for comparing it with the generated anomaly map
+            source_segmentation_mask_path = os.path.join(
+                self.evaluation_dataset_path,
+                label_subpath,
+                "label",
+                image_name + ".png"
+            )
+            segmentation_image = Image.open(source_segmentation_mask_path).convert("L")
+            segmentation_arr = np.array(segmentation_image)
 
-        # Preprocessing the segmentation masks: from BMAD codebase: https://github.com/DorisBao/BMAD/blob/main/UTRAD/data.py#L130 !!!
-        segmentation_arr[segmentation_arr >= 0.1] = 1
-        segmentation_arr[segmentation_arr < 0.1] = 0
-    
-        # Saving the image for visualization
-        dest_segmentation_mask_path = (
-            f"{self.anomaly_maps_images_path}/"
-            f"{image_name}_segmentation_mask_label_{label}.png"
-        )
-        Image.fromarray((255 * segmentation_arr) \
-            .astype("uint8")) \
-            .convert("L") \
-            .save(dest_segmentation_mask_path)
+            # Preprocessing the segmentation masks: from BMAD codebase: https://github.com/DorisBao/BMAD/blob/main/UTRAD/data.py#L130 !!!
+            segmentation_arr[segmentation_arr >= 0.1] = 1
+            segmentation_arr[segmentation_arr < 0.1] = 0
+        
+            # Saving the image for visualization
+            dest_segmentation_mask_path = (
+                f"{self.anomaly_maps_images_path}/"
+                f"{image_name}_segmentation_mask_label_{label}.png"
+            )
+            Image.fromarray((255 * segmentation_arr) \
+                .astype("uint8")) \
+                .convert("L") \
+                .save(dest_segmentation_mask_path)
 
-        # Saving the segmentation map as a numpy array for computing the pixel-level metrics
-        dest_segmentation_arr_path = (
-            f"{self.anomaly_maps_arrays_path}/"
-            f"{image_name}_segmentation_mask_label_{label}.npy"
-        )
-        np.save(file=dest_segmentation_arr_path, arr=segmentation_arr)
+            # Saving the segmentation map as a numpy array for computing the pixel-level metrics
+            dest_segmentation_arr_path = (
+                f"{self.anomaly_maps_arrays_path}/"
+                f"{image_name}_segmentation_mask_label_{label}.npy"
+            )
+            np.save(file=dest_segmentation_arr_path, arr=segmentation_arr)
    
     def run(self):
         results_dicts_file_paths = glob.glob(os.path.join(self.saved_dicts_folder, "*.json"))

@@ -50,14 +50,14 @@ class CropBackgroundBordersTransform:
         # image is PIL Image
         # convert to numpy array
         image_arr = np.array(image)
-        if self.dataset_name == "RESC":
+        if self.dataset_name in ["RESC", "OCT2017"]:
             image_arr = remove_noise(image_arr)
         borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
         cropped_img = image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
         # uid = uuid.uuid4()
-        # image.save(f"Test_cropped_images_RESC_valid/{uid}_original.jpg")
-        # cropped_img.save(f"Test_cropped_images_RESC_valid/{uid}_cropped.jpg")
-        # with open(f"Test_cropped_images_RESC_valid/{uid}_borders_dict.json", "w") as f:
+        # image.save(f"Test_cropped_images_OCT2017/{uid}_original.jpg")
+        # cropped_img.save(f"Test_cropped_images_OCT2017/{uid}_cropped.jpg")
+        # with open(f"Test_cropped_images_OCT2017/{uid}_borders_dict.json", "w") as f:
         #     json.dump(borders_dict, f)
 
         return cropped_img

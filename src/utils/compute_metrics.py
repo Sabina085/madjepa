@@ -36,11 +36,12 @@ def compute_roc_auc_metrics(
             image_scores.append(np.max(anomaly_map))
         gt_label_list.append(int(anomaly_map_path[-5]))
 
-    # For computing pixel level ROCAUC
-        anomaly_maps_list.append(anomaly_map)
-        gt_segmentations_list.append(np.load(segmentation_path)) 
+        if segmentation_path:
+            # For computing pixel level ROCAUC
+            anomaly_maps_list.append(anomaly_map)
+            gt_segmentations_list.append(np.load(segmentation_path)) 
 
-        image_name_list.append(anomaly_map_path.split("/")[-1])
+            image_name_list.append(anomaly_map_path.split("/")[-1])
     
     print("Number of anomalous samples: ", sum(gt_label_list))
     print("Total number of samples: ", len(gt_label_list))
@@ -60,15 +61,19 @@ def compute_roc_auc_metrics(
     plt.savefig(plot_probability_distribution_path)
     plt.close()
 
-    # Calculate per-pixel level ROCAUC
-    y_masks_gt = np.concatenate(gt_segmentations_list).astype('int')
-    y_amaps_pred = np.concatenate(anomaly_maps_list).astype('float32')
+    if segmentation_path:
+        # Calculate per-pixel level ROCAUC
+        y_masks_gt = np.concatenate(gt_segmentations_list).astype('int')
+        y_amaps_pred = np.concatenate(anomaly_maps_list).astype('float32')
 
-    fpr_pixel, tpr_pixel, thresholds_pixel = roc_curve(
-    y_true=y_masks_gt.flatten(), y_score=y_amaps_pred.flatten())
+        fpr_pixel, tpr_pixel, thresholds_pixel = roc_curve(
+        y_true=y_masks_gt.flatten(), y_score=y_amaps_pred.flatten())
 
-    pixel_roc_auc = roc_auc_score(
-    y_true=y_masks_gt.flatten(), y_score=y_amaps_pred.flatten())
+        pixel_roc_auc = roc_auc_score(
+            y_true=y_masks_gt.flatten(), y_score=y_amaps_pred.flatten()
+        )
+    else:
+         pixel_roc_auc = None
 
     return {
         "image_roc_auc": image_roc_auc,

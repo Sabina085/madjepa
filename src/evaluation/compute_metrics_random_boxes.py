@@ -16,17 +16,17 @@ class MetricsComputer:
         current_dir = subpath_list[-1]
         self.weight_distillation = weight_distillation
 
-        # self.experiment_folder_path = (
-        #     f"/{root_directory_path}/{current_dir}/"
-        #     f"experiments_{self.inference_config.dataset_name}/"
-        #     f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
-        # )
-
         self.experiment_folder_path = (
-            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
+            f"/{root_directory_path}/{current_dir}/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
         )
+
+        # self.experiment_folder_path = (
+        #     f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
+        #     f"experiments_{self.inference_config.dataset_name}/"
+        #     f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
+        # )
         
         self.anomaly_maps_arrays_path = (
             f"{self.experiment_folder_path}/"
@@ -92,9 +92,12 @@ class MetricsComputer:
                     )
             )
 
-        segmentation_paths = [
-            anomaly_map_path.replace("_anomaly_map_", "_segmentation_mask_") 
-            for anomaly_map_path in anomaly_maps_paths]
+        if self.inference_config.dataset_name in ["BraTS2021_slice", "hist_DIY", "RESC"]:
+            segmentation_paths = [
+                anomaly_map_path.replace("_anomaly_map_", "_segmentation_mask_") 
+                for anomaly_map_path in anomaly_maps_paths]
+        else:
+            segmentation_paths = [None] * len(anomaly_maps_paths)
 
         roc_auc_metrics = compute_roc_auc_metrics(
             image_statistic_for_classification=self.inference_config.image_statistic_for_classification, 
@@ -106,7 +109,8 @@ class MetricsComputer:
             weight_distillation=self.weight_distillation,
         )
         print('Image-level ROC-AUC: %.5f' % (roc_auc_metrics["image_roc_auc"]))
-        print('Pixel-level ROC-AUC: %.5f' % (roc_auc_metrics["pixel_roc_auc"]))
+        if self.inference_config.dataset_name in ["BraTS2021_slice", "hist_DIY", "RESC"]:
+            print('Pixel-level ROC-AUC: %.5f' % (roc_auc_metrics["pixel_roc_auc"]))
 
         metrics_df = pd.DataFrame(
             {

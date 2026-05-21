@@ -1,10 +1,10 @@
 import sys
-# sys.path.append("/home/sabina/PhD/IJepa-AD/ijepa-anomaly-detection")
-sys.path.append("/home/vhondru/istoian/ijepa-anomaly-detection")
+sys.path.append("/home/sabina/PhD/IJepa-AD/ijepa-anomaly-detection")
+# sys.path.append("/home/vhondru/istoian/ijepa-anomaly-detection")
 
 import os
-# os.chdir("/home/sabina/PhD/IJepa-AD/ijepa-anomaly-detection")
-os.chdir("/home/vhondru/istoian/ijepa-anomaly-detection")
+os.chdir("/home/sabina/PhD/IJepa-AD/ijepa-anomaly-detection")
+# os.chdir("/home/vhondru/istoian/ijepa-anomaly-detection")
 
 import torch
 import os
@@ -25,8 +25,8 @@ from src.utils.preprocessing import *
 from src.utils.dataset import *
 
 
-# STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
-STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
+STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
+# STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
 
 
 class PredictionsDistilledModelGenerator:
@@ -44,17 +44,17 @@ class PredictionsDistilledModelGenerator:
         root_directory_path = os.path.join(*subpath_list[:-1])
         current_dir = subpath_list[-1]
 
-        # self.experiment_folder_path = (
-        #     f"/{root_directory_path}/{current_dir}/"
-        #     f"experiments_{self.inference_anomaly_detection_config.dataset_name}/"
-        #     f"{self.inference_anomaly_detection_config.experiment_name}"
-        # )
-
         self.experiment_folder_path = (
-            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
+            f"/{root_directory_path}/{current_dir}/"
             f"experiments_{self.inference_anomaly_detection_config.dataset_name}/"
             f"{self.inference_anomaly_detection_config.experiment_name}"
         )
+
+        # self.experiment_folder_path = (
+        #     f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
+        #     f"experiments_{self.inference_anomaly_detection_config.dataset_name}/"
+        #     f"{self.inference_anomaly_detection_config.experiment_name}"
+        # )
 
         self.distillation_experiment_folder_path = (
             f"{self.experiment_folder_path}/checkpoints_distilled_model"

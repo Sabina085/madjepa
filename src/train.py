@@ -47,6 +47,7 @@ from src.utils.tensors import repeat_interleave_batch
 from src.datasets.brain_mri import make_brain_mri
 from src.datasets.liver_ct import make_liver_ct
 from src.datasets.resc import make_resc
+from src.datasets.oct2017 import make_oct2017
 
 
 from src.helper import (
@@ -254,6 +255,35 @@ def main(*args, **kwargs):
         )
 
         _, valid_unsupervised_loader, _ = make_resc(
+                transform=transform,
+                batch_size=config.batch_size,
+                collator=mask_collator,
+                pin_mem=config.pin_mem,
+                num_workers=config.num_workers,
+                world_size=world_size,
+                rank=rank,
+                root_path=config.data_root_folder_path,
+                image_folder=valid_image_folder,
+                drop_last=False,
+                is_train=False,
+        )
+    elif 'OCT2017' in config.image_folder:
+        # OCT2017 dataset
+        _, train_unsupervised_loader, train_unsupervised_sampler = make_oct2017(
+                transform=transform,
+                batch_size=config.batch_size,
+                collator=mask_collator,
+                pin_mem=config.pin_mem,
+                num_workers=config.num_workers,
+                world_size=world_size,
+                rank=rank,
+                root_path=config.data_root_folder_path,
+                image_folder=train_image_folder,
+                drop_last=False,
+                is_train=True,
+        )
+
+        _, valid_unsupervised_loader, _ = make_oct2017(
                 transform=transform,
                 batch_size=config.batch_size,
                 collator=mask_collator,
