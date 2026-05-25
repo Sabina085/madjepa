@@ -23,6 +23,8 @@ class AnomalyMapsBuilder:
         self.evaluation_dataset_path = (f"{STORAGE_PARENT_FOLDER_PATH}/"
                                         f"{self.inference_config.dataset_name}/{self.inference_config.split}")
         
+        self.use_distillation_model = use_distillation_model
+        
         self.experiment_folder_path = (
             f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/"
             f"experiments_{self.inference_config.dataset_name}/"
@@ -38,14 +40,14 @@ class AnomalyMapsBuilder:
         # Read the ijepa training configuration file (which was used for training the checkpoint)
         self.train_config = read_train_ijepa_config(config_path=self.train_config_path)
 
-        if not use_distillation_model:
+        if not self.use_distillation_model:
             # computing the anomaly map using the random boxes sampling
             self.anomaly_maps_arrays_path = (
                 f"{self.experiment_folder_path}/"
                 f"anomaly_maps_arrays_{self.inference_config.distance}_distance_"
                 f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
                 f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_sigma_"
-                f"{self.inference_config.gaussian_filter_blur_sigma}"
+                f"{self.inference_config.gaussian_filter_blur_sigma_ijepa}"
             )
 
             self.anomaly_maps_images_path = (
@@ -53,7 +55,7 @@ class AnomalyMapsBuilder:
                 f"anomaly_maps_images_{self.inference_config.distance}_distance_"
                 f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
                 f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
-                f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+                f"sigma_{self.inference_config.gaussian_filter_blur_sigma_ijepa}"
             )
 
             self.saved_dicts_folder = (
@@ -68,13 +70,13 @@ class AnomalyMapsBuilder:
             self.anomaly_maps_arrays_path = (
                 f"{self.experiment_folder_path}/"
                 f"anomaly_maps_arrays_distillation_{self.inference_config.distance}_distance_"
-                f"sigma_{self.inference_config.gaussian_filter_blur_sigma}_checkpoint_{self.distilled_model_hash_folder}"
+                f"sigma_{self.inference_config.gaussian_filter_blur_sigma_distillation}_checkpoint_{self.distilled_model_hash_folder}"
             )
 
             self.anomaly_maps_images_path = (
                 f"{self.experiment_folder_path}/"
                 f"anomaly_maps_images_distillation_{self.inference_config.distance}_distance_"
-                f"sigma_{self.inference_config.gaussian_filter_blur_sigma}_checkpoint_{self.distilled_model_hash_folder}"
+                f"sigma_{self.inference_config.gaussian_filter_blur_sigma_distillation}_checkpoint_{self.distilled_model_hash_folder}"
             )
             self.saved_dicts_folder = (
                 f"{self.experiment_folder_path}/"
@@ -121,11 +123,17 @@ class AnomalyMapsBuilder:
                 interpolation_method=cv2.INTER_LINEAR
             )
             
-            if self.inference_config.gaussian_filter_blur_sigma != -1:
+            if (not self.use_distillation_model) and (self.inference_config.gaussian_filter_blur_sigma_ijepa != -1):
                 anomaly_map = gaussian_filter(
                     anomaly_map,
-                    self.inference_config.gaussian_filter_blur_sigma
+                    self.inference_config.gaussian_filter_blur_sigma_ijepa
                 )
+            
+            if self.use_distillation_model and (self.inference_config.gaussian_filter_blur_sigma_distillation != -1):
+                anomaly_map = gaussian_filter(
+                    anomaly_map,
+                    self.inference_config.gaussian_filter_blur_sigma_distillation
+                )             
 
             dataset_min = min(np.min(anomaly_map), dataset_min)
             dataset_max = max(np.max(anomaly_map), dataset_max)
@@ -226,8 +234,17 @@ class AnomalyMapsBuilder:
                 interpolation_method=cv2.INTER_LINEAR
             )
 
-            if self.inference_config.gaussian_filter_blur_sigma != -1:
-                anomaly_map = gaussian_filter(anomaly_map, self.inference_config.gaussian_filter_blur_sigma)
+            if (not self.use_distillation_model) and (self.inference_config.gaussian_filter_blur_sigma_ijepa != -1):
+                anomaly_map = gaussian_filter(
+                    anomaly_map,
+                    self.inference_config.gaussian_filter_blur_sigma_ijepa
+                )
+            
+            if self.use_distillation_model and (self.inference_config.gaussian_filter_blur_sigma_distillation != -1):
+                anomaly_map = gaussian_filter(
+                    anomaly_map,
+                    self.inference_config.gaussian_filter_blur_sigma_distillation
+                ) 
 
             # MIN-MAX scaling to convert the pixels in the [0, 1] range so that we can display the anomaly maps
             # The min and the max values are computed at dataset level

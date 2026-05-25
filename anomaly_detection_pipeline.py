@@ -2,6 +2,7 @@ import subprocess
 import glob
 import argparse
 import yaml
+from instance_specific_config import ROOT_DIRECTORY_EXPERIMENTS_PATH
 
 def main(*args, **kwargs):
     parser = argparse.ArgumentParser(description="Pattern for the inference configuration files")
@@ -20,7 +21,7 @@ def main(*args, **kwargs):
         experiment_name = inference_config["data"]["experiment_name"]
         dataset_name = inference_config["data"]["dataset_name"]
 
-        train_distillation_config_path = glob.glob(f"experiments_{dataset_name}/{experiment_name}/checkpoints_distilled_model/*/config.yaml")[0]    
+        train_distillation_config_path = glob.glob(f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/experiments_{dataset_name}/{experiment_name}/checkpoints_distilled_model/*/config.yaml")[0]    
         print("Train distillation config path: ", train_distillation_config_path)
 
         scripts = [

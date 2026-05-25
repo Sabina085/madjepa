@@ -25,14 +25,14 @@ class MetricsComputer:
             f"anomaly_maps_arrays_{self.inference_config.distance}_distance_"
             f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
-            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+            f"sigma_{self.inference_config.gaussian_filter_blur_sigma_ijepa}"
         )
 
         self.distilled_model_hash_folder = train_distilled_model_config_path.split("/")[-2]
         self.anomaly_maps_distillation_arrays_path = (
             f"{self.experiment_folder_path}/"
             f"anomaly_maps_arrays_distillation_{self.inference_config.distance}_distance_"
-            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}_checkpoint_{self.distilled_model_hash_folder}"
+            f"sigma_{self.inference_config.gaussian_filter_blur_sigma_distillation}_checkpoint_{self.distilled_model_hash_folder}"
         )
 
         self.metrics_folder = f"{self.experiment_folder_path}/Metrics"
@@ -42,7 +42,8 @@ class MetricsComputer:
             f"{self.metrics_folder}/metrics_{self.inference_config.distance}_distance_"
             f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
-            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+            f"sigma_ijepa_{self.inference_config.gaussian_filter_blur_sigma_ijepa}_"
+            f"sigma_distillation_{self.inference_config.gaussian_filter_blur_sigma_distillation}_"
             f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
             f"_checkpoint_{self.distilled_model_hash_folder}"
             f"_distillation_weight_{self.weight_distillation}.csv"
@@ -52,7 +53,8 @@ class MetricsComputer:
             f"{self.metrics_folder}/probability_distribution_plot_{self.inference_config.distance}_distance_"
             f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
-            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+            f"sigma_ijepa_{self.inference_config.gaussian_filter_blur_sigma_ijepa}_"
+            f"sigma_distillation_{self.inference_config.gaussian_filter_blur_sigma_distillation}_"
             f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
             f"_checkpoint_{self.distilled_model_hash_folder}"
             f"_distillation_weight_{self.weight_distillation}.png"
@@ -62,7 +64,8 @@ class MetricsComputer:
             f"{self.metrics_folder}/roc_plot_{self.inference_config.distance}_distance_"
             f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
-            f"sigma_{self.inference_config.gaussian_filter_blur_sigma}"
+            f"sigma_ijepa_{self.inference_config.gaussian_filter_blur_sigma_ijepa}"
+            f"sigma_distillation_{self.inference_config.gaussian_filter_blur_sigma_distillation}"
             f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
             f"_checkpoint_{self.distilled_model_hash_folder}"
             f"_distillation_weight_{self.weight_distillation}.png"
@@ -110,7 +113,8 @@ class MetricsComputer:
                 "SPLIT": [self.inference_config.split],
                 "AGGREGATE_PATCHES_STRATEGY": [self.inference_config.aggregate_patches_strategy],
                 "NUM_TARGET_BOXES_PER_IMAGE": [self.inference_config.num_sampled_random_boxes_per_image],
-                "GAUSSIAN_FILTER_BLUR_SIGMA": [self.inference_config.gaussian_filter_blur_sigma],
+                "GAUSSIAN_FILTER_BLUR_SIGMA_IJEPA": [self.inference_config.gaussian_filter_blur_sigma_ijepa],
+                "GAUSSIAN_FILTER_BLUR_SIGMA_DISTILLATION": [self.inference_config.gaussian_filter_blur_sigma_distillation],
                 "PER_IMAGE_STATISTIC": [self.inference_config.image_statistic_for_classification],
                 "Image ROCAUC": [roc_auc_metrics["image_roc_auc"]],
                 "Pixel ROCAUC": [roc_auc_metrics["pixel_roc_auc"]],

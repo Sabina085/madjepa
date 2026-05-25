@@ -162,7 +162,8 @@ class InferenceAnomalyDetectionConfig():
    num_sampled_random_boxes_per_image: int
    distance: str
    aggregate_patches_strategy: str
-   gaussian_filter_blur_sigma: int
+   gaussian_filter_blur_sigma_ijepa: int
+   gaussian_filter_blur_sigma_distillation: int
    image_statistic_for_classification: str
 
    # --- misc
@@ -184,7 +185,8 @@ def read_inference_anomaly_detection_config(config_path: str) -> InferenceAnomal
     config.num_sampled_random_boxes_per_image = yaml_dict["inference"]["num_sampled_random_boxes_per_image"]
     config.distance = yaml_dict["inference"]["distance"]
     config.aggregate_patches_strategy = yaml_dict["inference"]["aggregate_patches_strategy"]
-    config.gaussian_filter_blur_sigma = yaml_dict["inference"]["gaussian_filter_blur_sigma"]
+    config.gaussian_filter_blur_sigma_ijepa = yaml_dict["inference"]["gaussian_filter_blur_sigma_ijepa"]
+    config.gaussian_filter_blur_sigma_distillation = yaml_dict["inference"]["gaussian_filter_blur_sigma_distillation"]
     # For computing the image-level metrics
     config.image_statistic_for_classification = yaml_dict["inference"]["image_statistic_for_classification"]
 
