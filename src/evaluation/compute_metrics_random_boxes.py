@@ -5,28 +5,20 @@ import pandas as pd
 from pathlib import Path
 from src.utils.configs import *
 from src.utils.compute_metrics import compute_roc_auc_metrics
+from instance_specific_config import ROOT_DIRECTORY_EXPERIMENTS_PATH
 
 class MetricsComputer:
     def __init__(self, inference_config_path: str, train_distilled_model_config_path: str, weight_distillation: float=0.0):
         self.inference_config = read_inference_anomaly_detection_config(
             config_path=inference_config_path)
 
-        subpath_list = os.getcwd().split(os.sep)
-        root_directory_path = os.path.join(*subpath_list[:-1])
-        current_dir = subpath_list[-1]
         self.weight_distillation = weight_distillation
 
         self.experiment_folder_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
         )
-
-        # self.experiment_folder_path = (
-        #     f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
-        #     f"experiments_{self.inference_config.dataset_name}/"
-        #     f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
-        # )
         
         self.anomaly_maps_arrays_path = (
             f"{self.experiment_folder_path}/"

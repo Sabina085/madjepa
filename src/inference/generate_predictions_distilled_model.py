@@ -1,11 +1,3 @@
-import sys
-sys.path.append("/home/sabina/PhD/IJepa-AD/ijepa-anomaly-detection")
-# sys.path.append("/home/vhondru/istoian/ijepa-anomaly-detection")
-
-import os
-os.chdir("/home/sabina/PhD/IJepa-AD/ijepa-anomaly-detection")
-# os.chdir("/home/vhondru/istoian/ijepa-anomaly-detection")
-
 import torch
 import os
 import glob
@@ -24,9 +16,9 @@ from src.utils.anomaly_maps import *
 from src.utils.preprocessing import *
 from src.utils.dataset import *
 
+from instance_specific_config import DATASET_PATH, ROOT_DIRECTORY_EXPERIMENTS_PATH
 
-STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
-# STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
+STORAGE_PARENT_FOLDER_PATH = DATASET_PATH
 
 
 class PredictionsDistilledModelGenerator:
@@ -37,24 +29,16 @@ class PredictionsDistilledModelGenerator:
         ):
         # Read the inference configuration file for anomaly detection
         self.inference_anomaly_detection_config = read_inference_anomaly_detection_config(config_path=inference_config_path)
-        self.distillation_model_path = train_distilled_model_config_path.replace("config.json", "student_model.pth")
+        self.distillation_model_path = train_distilled_model_config_path.replace("config.yaml", "student_model.pth")
         self.distillation_train_config_path = train_distilled_model_config_path
 
-        subpath_list = os.getcwd().split(os.sep)
-        root_directory_path = os.path.join(*subpath_list[:-1])
-        current_dir = subpath_list[-1]
 
         self.experiment_folder_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/"
             f"experiments_{self.inference_anomaly_detection_config.dataset_name}/"
             f"{self.inference_anomaly_detection_config.experiment_name}"
         )
 
-        # self.experiment_folder_path = (
-        #     f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
-        #     f"experiments_{self.inference_anomaly_detection_config.dataset_name}/"
-        #     f"{self.inference_anomaly_detection_config.experiment_name}"
-        # )
 
         self.distillation_experiment_folder_path = (
             f"{self.experiment_folder_path}/checkpoints_distilled_model"
@@ -84,7 +68,8 @@ class PredictionsDistilledModelGenerator:
         os.makedirs(self.save_per_patch_results_folder, exist_ok=True)
 
         self.evaluation_dataset_path = (
-            f"{STORAGE_PARENT_FOLDER_PATH}/{self.inference_anomaly_detection_config.dataset_name}/"
+            f"{STORAGE_PARENT_FOLDER_PATH}/"
+            f"{self.inference_anomaly_detection_config.dataset_name}/"
             f"{self.inference_anomaly_detection_config.split}"
         )
 
@@ -204,15 +189,15 @@ class PredictionsDistilledModelGenerator:
                 with torch.no_grad():
                     # --- Target encoder (teacher) forward prop
                     target_encoder_emb = target_encoder(image)
-                    # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                    target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
                     # --- Student model forward prop
                     student_emb = student_model(image).last_hidden_state[:, 1: , :]
-                    # student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
+                    student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
 
                     assert target_encoder_emb.shape == student_emb.shape
 
-                    # target_encoder_emb = F.normalize(target_encoder_emb, dim=-1)
-                    # student_emb = F.normalize(student_emb, dim=-1)
+                    target_encoder_emb = F.normalize(target_encoder_emb, dim=-1)
+                    student_emb = F.normalize(student_emb, dim=-1)
 
                     # --- Compute the metrics
                     # Average distance between the predicted and target patch-level representations (embeddings) for the random box

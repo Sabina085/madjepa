@@ -20,7 +20,7 @@ def main(*args, **kwargs):
         experiment_name = inference_config["data"]["experiment_name"]
         dataset_name = inference_config["data"]["dataset_name"]
 
-        train_distillation_config_path = glob.glob(f"experiments_{dataset_name}/{experiment_name}/checkpoints_distilled_model/a5bd70b66a814550/config.json")[0]    
+        train_distillation_config_path = glob.glob(f"experiments_{dataset_name}/{experiment_name}/checkpoints_distilled_model/*/config.yaml")[0]    
         print("Train distillation config path: ", train_distillation_config_path)
 
         scripts = [
@@ -30,7 +30,19 @@ def main(*args, **kwargs):
             ["python3", "-m", "src.evaluation.build_anomaly_maps", f"--inference_config_path={inference_config_path}", "--use_distillation_model", f"--train_distilled_model_config_path={train_distillation_config_path}"],
             ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}"],
             ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5", f"--train_distilled_model_config_path={train_distillation_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=1.0", f"--train_distilled_model_config_path={train_distillation_config_path}"]
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=1.0", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.75", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.9", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.95", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.85", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.91", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.92", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.93", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.94", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.89", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.88", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.87", f"--train_distilled_model_config_path={train_distillation_config_path}"],
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.86", f"--train_distilled_model_config_path={train_distillation_config_path}"],
         ]
 
         for cmd in scripts:

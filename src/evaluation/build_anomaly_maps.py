@@ -12,43 +12,28 @@ from src.utils.inference import *
 from src.utils.configs import *
 from src.utils.anomaly_maps import *
 
-STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
-# STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
+from instance_specific_config import DATASET_PATH, ROOT_DIRECTORY_EXPERIMENTS_PATH
+
+STORAGE_PARENT_FOLDER_PATH = DATASET_PATH
 
 class AnomalyMapsBuilder:
     def __init__(self, inference_config_path: str, use_distillation_model: bool=False, train_distilled_model_config_path: str=None):
         self.inference_config = read_inference_anomaly_detection_config(config_path=inference_config_path)
 
-        subpath_list = os.getcwd().split(os.sep)
-        root_directory_path = os.path.join(*subpath_list[:-1])
-        current_dir = subpath_list[-1]
-
-        self.evaluation_dataset_path = (f"{STORAGE_PARENT_FOLDER_PATH}"
+        self.evaluation_dataset_path = (f"{STORAGE_PARENT_FOLDER_PATH}/"
                                         f"{self.inference_config.dataset_name}/{self.inference_config.split}")
         
         self.experiment_folder_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
         )
 
-        # self.experiment_folder_path = (
-        #     f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
-        #     f"experiments_{self.inference_config.dataset_name}/"
-        #     f"{self.inference_config.experiment_name}/results_{self.inference_config.split}"
-        # )
-
         self.train_config_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/logs/config_run.yaml"
         )
-
-        # self.train_config_path = (
-        #     f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
-        #     f"experiments_{self.inference_config.dataset_name}/"
-        #     f"{self.inference_config.experiment_name}/logs/config_run.yaml"
-        # )
 
         # Read the ijepa training configuration file (which was used for training the checkpoint)
         self.train_config = read_train_ijepa_config(config_path=self.train_config_path)

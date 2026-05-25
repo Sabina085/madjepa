@@ -20,12 +20,14 @@ from src.helper import (
     load_models_from_checkpoint,
     init_model_dinov3
 )
+from instance_specific_config import DATASET_PATH, ROOT_DIRECTORY_EXPERIMENTS_PATH
+
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import torch.nn.functional as F
 from transformers import ViTConfig, ViTModel
 
-# STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD"
-STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset"
+
+STORAGE_PARENT_FOLDER_PATH = DATASET_PATH
 
 class DistilledModelTrainer:
     def __init__(self, train_distillation_config_path: str):
@@ -41,18 +43,9 @@ class DistilledModelTrainer:
         self._set_optimization_configuration()
 
     def _set_prerequisites(self):
-        subpath_list = os.getcwd().split(os.sep)
-        root_directory_path = os.path.join(*subpath_list[:-1])
-        current_dir = subpath_list[-1]
-
-        # self.experiment_folder_path = (
-        #     f"/{root_directory_path}/{current_dir}/"
-        #     f"experiments_{self.train_distillation_config.dataset_name}/"
-        #     f"{self.train_distillation_config.experiment_name}"
-        # )
 
         self.experiment_folder_path = (
-            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
+            f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/"
             f"experiments_{self.train_distillation_config.dataset_name}/"
             f"{self.train_distillation_config.experiment_name}"
         )
@@ -74,14 +67,8 @@ class DistilledModelTrainer:
         json_train_distillation_config_sorted = json.dumps(vars(self.train_distillation_config), sort_keys=True)
         self.distillation_config_hash = hashlib.sha256(json.dumps(json_train_distillation_config_sorted).encode()).hexdigest()[: 16]
 
-        # self.distilled_model_folder_path = (
-        #     f"/{root_directory_path}/{current_dir}/"
-        #     f"experiments_{self.train_distillation_config.dataset_name}/"
-        #     f"{self.train_distillation_config.experiment_name}/checkpoints_distilled_model/{self.distillation_config_hash}"
-        # )
-
         self.distilled_model_folder_path = (
-            f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
+            f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/"
             f"experiments_{self.train_distillation_config.dataset_name}/"
             f"{self.train_distillation_config.experiment_name}/checkpoints_distilled_model/{self.distillation_config_hash}"
         )
@@ -307,7 +294,7 @@ class DistilledModelTrainer:
         distillation_optimizer_path = os.path.join(self.distilled_model_folder_path, "optimizer.pth")
         torch.save(self.optimizer.state_dict(), distillation_optimizer_path)
 
-        trained_distillation_config_path = os.path.join(self.distilled_model_folder_path, "config.json")
+        trained_distillation_config_path = os.path.join(self.distilled_model_folder_path, "config.yaml")
         shutil.copy2(src=self.train_distillation_config_path, dst=trained_distillation_config_path)
 
         # Save filters of the trained student model

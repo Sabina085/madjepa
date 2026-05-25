@@ -21,8 +21,11 @@ from src.masks.utils import apply_masks
 from src.utils.tensors import repeat_interleave_batch
 from src.masks.multiblock import MaskCollator
 
-STORAGE_PARENT_FOLDER_PATH = "/home/sabina/PhD/BMAD/"
-# STORAGE_PARENT_FOLDER_PATH = "/media/vhondru/hdd/istoian/BMAD/dataset/"
+from instance_specific_config import DATASET_PATH, ROOT_DIRECTORY_EXPERIMENTS_PATH
+
+STORAGE_PARENT_FOLDER_PATH = DATASET_PATH
+
+print(STORAGE_PARENT_FOLDER_PATH)
 
 
 class PredictionsRandomBoxesGenerator:
@@ -30,40 +33,24 @@ class PredictionsRandomBoxesGenerator:
         # Read the inference configuration file for anomaly detection
         self.inference_config = read_inference_anomaly_detection_config(config_path=inference_config_path)
 
-        subpath_list = os.getcwd().split(os.sep)
-        root_directory_path = os.path.join(*subpath_list[:-1])
-        current_dir = subpath_list[-1]
-
         self.evaluation_dataset_path = (
-            f"{STORAGE_PARENT_FOLDER_PATH}"
+            f"{STORAGE_PARENT_FOLDER_PATH}/"
             f"{self.inference_config.dataset_name}/{self.inference_config.split}"
         )
 
         self.experiment_folder_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/"
             f"results_{self.inference_config.split}"
         )
 
-        # self.experiment_folder_path = (
-        #     f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
-        #     f"experiments_{self.inference_config.dataset_name}/"
-        #     f"{self.inference_config.experiment_name}/"
-        #     f"results_{self.inference_config.split}"
-        # )
-
         self.train_config_path = (
-            f"/{root_directory_path}/{current_dir}/"
+            f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/"
             f"experiments_{self.inference_config.dataset_name}/"
             f"{self.inference_config.experiment_name}/logs/config_run.yaml"
         )
 
-        # self.train_config_path = (
-        #     f"/media/vhondru/hdd/istoian/ijepa-anomaly-detection/"
-        #     f"experiments_{self.inference_config.dataset_name}/"
-        #     f"{self.inference_config.experiment_name}/logs/config_run.yaml"
-        # )
 
         # Read the ijepa training configuration file (which was used for training the checkpoint)
         self.train_config = read_train_ijepa_config(config_path=self.train_config_path)
@@ -392,7 +379,7 @@ class PredictionsRandomBoxesGenerator:
                         # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
                         target_encoder_emb = target_encoder(image)
                         # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
-                        # target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                        target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
                         # retrieve the batch size
                         B = len(target_encoder_emb)
                         
