@@ -21,6 +21,7 @@ class TrainIjepaConfig():
     # --- target encoder
     target_encoder_model_name: str
     target_encoder_weights_source: str
+    layer_norm_teacher: bool
 
     # --- data
     batch_size: int
@@ -87,6 +88,7 @@ def read_train_ijepa_config(config_path: str) -> TrainIjepaConfig:
     # --- target encoder
     config.target_encoder_model_name = config_dict["meta"]["target_encoder_model_name"]
     config.target_encoder_weights_source = config_dict["meta"]["target_encoder_weights_source"]
+    config.layer_norm_teacher = config_dict["meta"]["layer_norm_teacher"]
 
     # --- predictor
     config.predictor_model_name = config_dict["meta"]["predictor_model_name"]
@@ -218,6 +220,7 @@ class TrainDistillationConfig:
     weight_decay: float
     patience: int
     hidden_dropout_prob: float
+    normalize_before_computing_distance: float
 
 
 def read_train_distillation_config(config_path: str) -> TrainDistillationConfig:
@@ -242,5 +245,6 @@ def read_train_distillation_config(config_path: str) -> TrainDistillationConfig:
     config.weight_decay = float(yaml_dict["optimization"]["weight_decay"])
     config.patience = int(yaml_dict["optimization"]["patience"])
     config.hidden_dropout_prob = float(yaml_dict["optimization"]["hidden_dropout_prob"])
+    config.normalize_before_computing_distance = bool(yaml_dict["optimization"]["normalize_before_computing_distance"])
 
     return config

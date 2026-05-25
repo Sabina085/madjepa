@@ -379,7 +379,8 @@ class PredictionsRandomBoxesGenerator:
                         # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
                         target_encoder_emb = target_encoder(image)
                         # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
-                        target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                        if self.train_config.layer_norm_teacher:
+                            target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
                         # retrieve the batch size
                         B = len(target_encoder_emb)
                         

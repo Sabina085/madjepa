@@ -189,15 +189,19 @@ class PredictionsDistilledModelGenerator:
                 with torch.no_grad():
                     # --- Target encoder (teacher) forward prop
                     target_encoder_emb = target_encoder(image)
-                    target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                    if self.ijepa_train_config.layer_norm_teacher:
+                        target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                        
                     # --- Student model forward prop
                     student_emb = student_model(image).last_hidden_state[:, 1: , :]
-                    student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
+                    if self.ijepa_train_config.layer_norm_teacher:
+                        student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
 
                     assert target_encoder_emb.shape == student_emb.shape
 
-                    target_encoder_emb = F.normalize(target_encoder_emb, dim=-1)
-                    student_emb = F.normalize(student_emb, dim=-1)
+                    if self.distillation_train_config.normalize_before_computing_distance:
+                        target_encoder_emb = F.normalize(target_encoder_emb, dim=-1)
+                        student_emb = F.normalize(student_emb, dim=-1)
 
                     # --- Compute the metrics
                     # Average distance between the predicted and target patch-level representations (embeddings) for the random box

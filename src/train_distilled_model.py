@@ -184,21 +184,23 @@ class DistilledModelTrainer:
 
         self.target_encoder = loaded_dict_from_checkpoint["target_encoder"]
 
-    def _loss_fn(self, student, teacher):
+    def _loss_fn(self, student_pred, teacher_pred):
         # student, teacher: [B, N_patches, 384]
-        assert student.shape == teacher.shape
+        assert student_pred.shape == teacher_pred.shape
 
-        student_norm = F.normalize(student, dim=-1)  # normalize each patch vector independently
-        teacher_norm = F.normalize(teacher, dim=-1)
+        if self.train_distillation_config.normalize_before_computing_distance:
+            student_pred = F.normalize(student_pred, dim=-1)  # normalize each patch vector independently
+            teacher_pred = F.normalize(teacher_pred, dim=-1)
         
-        return self.criterion(student_norm, teacher_norm)
+        return self.criterion(student_pred, teacher_pred)
     
-    def _loss_fn_valid(self, student, teacher):
+    def _loss_fn_valid(self, student_pred, teacher_pred):
         # student, teacher: [B, N_patches, 384]
-        student_norm = F.normalize(student, dim=-1)  # normalize each patch vector independently
-        teacher_norm = F.normalize(teacher, dim=-1)
+        if self.train_distillation_config.normalize_before_computing_distance:
+            student_pred = F.normalize(student_pred, dim=-1)  # normalize each patch vector independently
+            teacher_pred = F.normalize(teacher_pred, dim=-1)
 
-        return self.valid_criterion(student_norm, teacher_norm)
+        return self.valid_criterion(student_pred, teacher_pred)
 
     def _set_optimization_configuration(self):
         # Freeze the target encoder weights
@@ -334,16 +336,18 @@ class DistilledModelTrainer:
                 with torch.no_grad():
                     # --- Target encoder forward prop
                     target_encoder_emb = self.target_encoder(image)
-                    target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
+                    if self.train_ijepa_config.layer_norm_teacher:
+                        target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
 
                 # [CLS] token -> position 0; 
                 student_emb = self.student_model(image).last_hidden_state[:, 1: , :]
-                student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
+                if self.train_ijepa_config.layer_norm_teacher:
+                    student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
 
                 assert target_encoder_emb.shape == student_emb.shape
 
                 self.optimizer.zero_grad()
-                loss = self._loss_fn(student=student_emb, teacher=target_encoder_emb)
+                loss = self._loss_fn(student_pred=student_emb, teacher_pred=target_encoder_emb)
                 loss.backward()
                 self.optimizer.step()
 
@@ -390,13 +394,16 @@ class DistilledModelTrainer:
                     with torch.no_grad():
                         # --- Target encoder forward prop
                         valid_target_encoder_emb = self.target_encoder(valid_image)
-                        valid_target_encoder_emb = F.layer_norm(valid_target_encoder_emb, (valid_target_encoder_emb.size(-1),))  # normalize over feature-dim
+                        if self.train_ijepa_config.layer_norm_teacher:
+                            valid_target_encoder_emb = F.layer_norm(valid_target_encoder_emb, (valid_target_encoder_emb.size(-1),))  # normalize over feature-dim
+
                         valid_student_emb = self.student_model(valid_image).last_hidden_state[:, 1: , :]
-                        valid_student_emb = F.layer_norm(valid_student_emb, (valid_student_emb.size(-1),))  # normalize over feature-dim
+                        if self.train_ijepa_config.layer_norm_teacher:
+                            valid_student_emb = F.layer_norm(valid_student_emb, (valid_student_emb.size(-1),))  # normalize over feature-dim
 
                         assert valid_target_encoder_emb.shape == valid_student_emb.shape
 
-                        valid_loss = self._loss_fn_valid(student=valid_student_emb, teacher=valid_target_encoder_emb).detach().cpu().numpy()
+                        valid_loss = self._loss_fn_valid(student_pred=valid_student_emb, teacher_pred=valid_target_encoder_emb).detach().cpu().numpy()
                         valid_label_arr = valid_label.detach().cpu().numpy()
 
                         anomaly_indices = np.where(valid_label_arr == 1)[0]
