@@ -220,6 +220,7 @@ class TrainDistillationConfig:
     weight_decay: float
     patience: int
     hidden_dropout_prob: float
+    layer_norm: bool
     normalize_before_computing_distance: float
 
 
@@ -245,6 +246,7 @@ def read_train_distillation_config(config_path: str) -> TrainDistillationConfig:
     config.weight_decay = float(yaml_dict["optimization"]["weight_decay"])
     config.patience = int(yaml_dict["optimization"]["patience"])
     config.hidden_dropout_prob = float(yaml_dict["optimization"]["hidden_dropout_prob"])
+    config.layer_norm = bool(yaml_dict["optimization"]["layer_norm"])
     config.normalize_before_computing_distance = bool(yaml_dict["optimization"]["normalize_before_computing_distance"])
 
     return config

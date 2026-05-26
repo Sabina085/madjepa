@@ -336,12 +336,12 @@ class DistilledModelTrainer:
                 with torch.no_grad():
                     # --- Target encoder forward prop
                     target_encoder_emb = self.target_encoder(image)
-                    if self.train_ijepa_config.layer_norm_teacher:
+                    if self.train_distillation_config.layer_norm:
                         target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
 
                 # [CLS] token -> position 0; 
                 student_emb = self.student_model(image).last_hidden_state[:, 1: , :]
-                if self.train_ijepa_config.layer_norm_teacher:
+                if self.train_distillation_config.layer_norm:
                     student_emb = F.layer_norm(student_emb, (student_emb.size(-1),))  # normalize over feature-dim
 
                 assert target_encoder_emb.shape == student_emb.shape
@@ -394,11 +394,11 @@ class DistilledModelTrainer:
                     with torch.no_grad():
                         # --- Target encoder forward prop
                         valid_target_encoder_emb = self.target_encoder(valid_image)
-                        if self.train_ijepa_config.layer_norm_teacher:
+                        if self.train_distillation_config.layer_norm:
                             valid_target_encoder_emb = F.layer_norm(valid_target_encoder_emb, (valid_target_encoder_emb.size(-1),))  # normalize over feature-dim
 
                         valid_student_emb = self.student_model(valid_image).last_hidden_state[:, 1: , :]
-                        if self.train_ijepa_config.layer_norm_teacher:
+                        if self.train_distillation_config.layer_norm:
                             valid_student_emb = F.layer_norm(valid_student_emb, (valid_student_emb.size(-1),))  # normalize over feature-dim
 
                         assert valid_target_encoder_emb.shape == valid_student_emb.shape
