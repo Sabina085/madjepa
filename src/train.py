@@ -49,6 +49,7 @@ from src.datasets.liver_ct import make_liver_ct
 from src.datasets.resc import make_resc
 from src.datasets.oct2017 import make_oct2017
 from src.datasets.chest_rsna import make_chest_rsna
+from src.datasets.camelyon import make_camelyon
 
 
 from src.helper import (
@@ -326,7 +327,36 @@ def main(*args, **kwargs):
                 drop_last=False,
                 is_train=False,
         )
+    elif 'camelyon16_256' in config.image_folder:
+        _, train_unsupervised_loader, train_unsupervised_sampler = make_camelyon(
+                transform=transform,
+                batch_size=config.batch_size,
+                collator=mask_collator,
+                pin_mem=config.pin_mem,
+                num_workers=config.num_workers,
+                world_size=world_size,
+                rank=rank,
+                root_path=config.data_root_folder_path,
+                image_folder=train_image_folder,
+                drop_last=False,
+                is_train=True,
+        )
 
+        _, valid_unsupervised_loader, _ = make_camelyon(
+                transform=transform,
+                batch_size=config.batch_size,
+                collator=mask_collator,
+                pin_mem=config.pin_mem,
+                num_workers=config.num_workers,
+                world_size=world_size,
+                rank=rank,
+                root_path=config.data_root_folder_path,
+                image_folder=valid_image_folder,
+                drop_last=False,
+                is_train=False,
+        )
+    else:
+        raise ValueError(f"The image folder from config {config.image_folder} does not point to a valid dataset.")
 
     print("Train set = ", len(train_unsupervised_loader))
     print("Validation set = ", len(valid_unsupervised_loader))
