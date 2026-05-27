@@ -141,6 +141,11 @@ class AnomalyMapsBuilder:
         return dataset_min, dataset_max
     
     def save_results(self, image_name, label, scaled_anomaly_map):
+        if "camelyon16_256" in self.train_config.image_folder:
+            # In Camelyon16_256 dataset, some images of different types (anomaly, normal) have the same name. Hence, the image_name won't be a unique identifier in that case.
+            # We appended the label to the image name in order to distinguish between the anomaly/normal images that have identical name.
+            image_name = image_name[:-2] # Removing the label from image_name in order to find the path of the orginal image
+
         # Save the scaled anomaly map
         scaled_anomaly_map_path = (
             f"{self.anomaly_maps_arrays_path}/"
@@ -163,11 +168,11 @@ class AnomalyMapsBuilder:
             "img", image_name + ".png"
         )
         initial_image = cv2.imread(image_path)
-        cv2.imwrite(f"{self.anomaly_maps_images_path}/{image_name}_original.png", initial_image)
+        cv2.imwrite(f"{self.anomaly_maps_images_path}/{image_name}_label_{label}_original.png", initial_image)
         initial_image = (initial_image * 255).astype(np.uint8)
 
         heatmap = cv2.addWeighted(scaled_anomaly_map, 0.4, initial_image, (1 - 0.4), 0)
-        cv2.imwrite(f"{self.anomaly_maps_images_path}/{image_name}_heatmap.png", heatmap)
+        cv2.imwrite(f"{self.anomaly_maps_images_path}/{image_name}_label_{label}_heatmap.png", heatmap)
 
         if self.inference_config.dataset_name in ["BraTS2021_slice", "hist_DIY", "RESC"]:
             # We are saving in the same folder the ground-truth segmentation mask for comparing it with the generated anomaly map

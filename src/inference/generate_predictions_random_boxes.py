@@ -362,6 +362,10 @@ class PredictionsRandomBoxesGenerator:
                     image = image.to(self.device)
                     label = label.detach().item()
                     image_name = image_name[0].split('.')[0]
+                    if "camelyon16_256" in self.train_config.image_folder:
+                        # In Camelyon16_256 dataset, some images of different types (anomaly, normal) have the same name. Hence, the image_name won't be a unique identifier in that case.
+                        # We will append the label to the image name in order to distinguish between the anomaly/normal images that have identical name.
+                        image_name = f"{image_name}_{label}"
 
                     if box_idx == 0:
                         image_per_patch_distances[image_name] = {patch_idx: [] for patch_idx in range(num_patches)}

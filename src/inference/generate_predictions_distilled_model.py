@@ -185,6 +185,10 @@ class PredictionsDistilledModelGenerator:
                 image = image.to(self.device)
                 label = label.detach().cpu().item()
                 image_name = image_name[0].split('.')[0]
+                if "camelyon16_256" in self.distillation_train_config.dataset_name:
+                    # In Camelyon16_256 dataset, some images of different types (anomaly, normal) have the same name. Hence, the image_name won't be a unique identifier in that case.
+                    # We will append the label to the image name in order to distinguish between the anomaly/normal images that have identical name.
+                    image_name = f"{image_name}_{label}"
 
                 with torch.no_grad():
                     # --- Target encoder (teacher) forward prop
