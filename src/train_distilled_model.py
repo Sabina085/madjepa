@@ -208,11 +208,25 @@ class DistilledModelTrainer:
             param.requires_grad = False
 
         # Feed the trainable parameters of the student to the optimizer
-        trainable_params = [param for param in self.student_model.parameters() if param.requires_grad]
+        trainable_params_w_decay = []
+        trainable_params_wo_decay = []
+        for name, param in self.student_model.named_parameters():
+            if param.requires_grad:
+                if ("bias" in name) or ('norm' in name):
+                    trainable_params_wo_decay.append(param)
+                else:
+                    trainable_params_w_decay.append(param)
+
         self.optimizer = torch.optim.AdamW(
-            params=trainable_params,
+            [{
+                "params": trainable_params_w_decay,
+                "weight_decay": self.train_distillation_config.weight_decay
+            },
+            {
+                "params": trainable_params_wo_decay,
+                "weight_decay": 0.0
+            }], 
             lr=self.train_distillation_config.peak_lr,
-            weight_decay=self.train_distillation_config.weight_decay
         )
         self.criterion = torch.nn.MSELoss()
         self.valid_criterion = torch.nn.MSELoss(reduction="none")

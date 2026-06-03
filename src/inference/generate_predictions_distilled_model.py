@@ -173,6 +173,7 @@ class PredictionsDistilledModelGenerator:
             )
 
             student_model = ViTModel(configuration).to(self.device)
+            print("Distillation model path: ", self.distillation_model_path)
             student_model.load_state_dict(torch.load(self.distillation_model_path, weights_only=True))
 
             _, eval_loader = self._load_evaluation_dataset()
