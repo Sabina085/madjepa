@@ -250,3 +250,44 @@ def read_train_distillation_config(config_path: str) -> TrainDistillationConfig:
     config.normalize_before_computing_distance = bool(yaml_dict["optimization"]["normalize_before_computing_distance"])
 
     return config
+
+
+class TrainSyntheticAnomalyClassifierConfig:
+    # data
+    subset: str
+    experiment_name: str
+
+    # model
+    hidden_size: int
+    activation: int
+
+    # optimization
+    num_epochs: int
+    lr: float
+    weight_decay: float
+    batch_size: int
+    drop_rate: float
+    num_workers: int
+
+def read_train_synthetic_anomaly_classifier_config(config_path: str) -> TrainSyntheticAnomalyClassifierConfig:
+    with open(config_path, "r") as f:
+        yaml_dict = yaml.safe_load(f)
+    config = TrainSyntheticAnomalyClassifierConfig()
+
+    # data
+    config.subset = yaml_dict["data"]["subset"]
+    config.experiment_name = yaml_dict["data"]["experiment_name"]
+
+    # model
+    config.hidden_size = int(yaml_dict["model"]["hidden_size"])
+    config.activation = yaml_dict["model"]["activation"]
+
+    # optimization
+    config.num_epochs = int(yaml_dict["optimization"]["num_epochs"])
+    config.lr = float(yaml_dict["optimization"]["lr"])
+    config.weight_decay = float(yaml_dict["optimization"]["lr"])
+    config.batch_size = int(yaml_dict["optimization"]["batch_size"])
+    config.drop_rate = float(yaml_dict["optimization"]["drop_rate"])
+    config.num_workers = int(yaml_dict["optimization"]["num_workers"])
+
+    return config
