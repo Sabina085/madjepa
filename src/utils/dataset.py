@@ -51,7 +51,7 @@ class SegmentationWithLabelDataset(Dataset):
         # crop the background border from the image
         image_arr = np.array(original_image)
 
-        if self.dataset_name == "RESC":
+        if self.dataset_name in ["RESC", "OCT2017"]:
             image_arr = remove_noise(image_arr)
 
         borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
@@ -101,7 +101,7 @@ class LabelDataset(Dataset):
         # crop the background border from the image
         image_arr = np.array(original_image)
 
-        if self.dataset_name == "RESC":
+        if self.dataset_name in ["RESC", "OCT2017"]:
             image_arr = remove_noise(image_arr)
 
         borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
@@ -138,7 +138,7 @@ class ImageDataset(Dataset):
         # crop the background border from the image
         image_arr = np.array(original_image)
 
-        if self.dataset_name == "RESC":
+        if self.dataset_name in ["RESC", "OCT2017"]:
             image_arr = remove_noise(image_arr)
 
         borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
