@@ -11,6 +11,7 @@ class MetricsComputer:
     def __init__(self, 
             inference_config_path: str, 
             train_distilled_model_config_path: str, 
+            train_classifier_config_path: str,
             weight_distillation: float=0.0,
             weight_classification: float=0.0
         ):
@@ -36,7 +37,7 @@ class MetricsComputer:
         )
 
         # Distilled model anomaly maps
-        self.distilled_model_hash_folder = train_distilled_model_config_path.split("/")[-2]
+        self.distilled_model_hash_folder = Path(train_distilled_model_config_path).parent.name
         self.anomaly_maps_distillation_arrays_path = (
             f"{self.experiment_folder_path}/"
             f"anomaly_maps_arrays_distillation_{self.inference_config.distance}_distance_"
@@ -44,7 +45,7 @@ class MetricsComputer:
         )
 
         # Pseudo-anomaly classifier results
-        self.classifier_hash_folder = "0aea96f5663b0527" # Path(self.classifier_ckpt_path).parent.name
+        self.classifier_hash_folder = Path(train_classifier_config_path).parent.name
         self.classifier_results_folder = os.path.join(
             self.experiment_folder_path,
             f"image_classifier_results_checkpoint_{self.classifier_hash_folder}"
@@ -160,7 +161,8 @@ class MetricsComputer:
 def main(*args, **kwargs):
     parser = argparse.ArgumentParser()
     parser.add_argument("--inference_config_path", type=str, help="Path to the inference config used for generating the anomaly maps.")
-    parser.add_argument("--train_distilled_model_config_path", type=str, help="Path to the training config of the distilled model which will be used for computing the results")
+    parser.add_argument("--train_distilled_model_config_path", type=str, help="Path to the training config of the distilled model which will be used for computing the results.")
+    parser.add_argument("--train_classifier_config_path", type=str, help="Path to the training config of the classifier model which will be used for computing the results.")
     parser.add_argument("--weight_distillation", type=float, default=0.0, help="Weight of the distillation anomaly map when computing the metrics.")
     parser.add_argument("--weight_classification", type=float, default=0.0, help="Weight of the pseudo-anomaly classification score when computing the metrics.")
 
@@ -168,6 +170,7 @@ def main(*args, **kwargs):
     metrics_computer = MetricsComputer(
         inference_config_path=args.inference_config_path,
         train_distilled_model_config_path=args.train_distilled_model_config_path,
+        train_classifier_config_path=args.train_classifier_config_path,
         weight_distillation=float(args.weight_distillation),
         weight_classification=float(args.weight_classification)
     )

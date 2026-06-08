@@ -23,11 +23,13 @@ STORAGE_PARENT_FOLDER_PATH = DATASET_PATH
 
 
 class PredictionsClassifierModelGenerator:
-    def __init__(self, inference_config_path: str):
+    def __init__(self, inference_config_path: str, train_classification_model_config_path: str):
         self.inference_anomaly_detection_config = read_inference_anomaly_detection_config(
             config_path=inference_config_path
         )
-
+        self.classifier_config = read_train_synthetic_anomaly_classifier_config(
+            config_path=train_classification_model_config_path)
+        
         self.experiment_folder_path = (
             f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/"
             f"experiments_{self.inference_anomaly_detection_config.dataset_name}/"
@@ -43,26 +45,12 @@ class PredictionsClassifierModelGenerator:
             f"{self.inference_anomaly_detection_config.experiment_name}-latest.pth.tar",
         )
 
-        # Select classifier checkpoint with best validation AUC (encoded in filename)
-        candidates = sorted(
-            glob.glob(os.path.join(self.experiment_folder_path, "checkpoints_classifier/*/*.pth"))
-        )
-        best_path = candidates[0]
-        best_auc = float(Path(best_path).stem.split("-")[-1])
-        for path in candidates[1:]:
-            auc = float(Path(path).stem.split("-")[-1])
-            if auc > best_auc:
-                best_path = path
-                best_auc = auc
+        self.classifier_hash_folder = Path(train_classification_model_config_path).parent.name
+        self.classifier_ckpt_path = glob.glob(os.path.join(Path(train_classification_model_config_path).parent, "*.pth"))[0]
 
-        self.classifier_ckpt_path = best_path
-        self.classifier_config_path = os.path.join(Path(best_path).parent, "config.yaml")
-        self.classifier_config = read_train_synthetic_anomaly_classifier_config(self.classifier_config_path)
-
-        print("Classifier config path:", self.classifier_config_path)
+        print("Classifier config path:", train_classification_model_config_path)
         print("Classifier checkpoint path:", self.classifier_ckpt_path)
-
-        self.classifier_hash_folder = Path(self.classifier_ckpt_path).parent.name
+        
         self.save_classifier_results_folder = os.path.join(
             self.experiment_folder_path,
             f"results_{self.inference_anomaly_detection_config.split}",
@@ -187,9 +175,15 @@ def main():
     parser.add_argument(
         "--inference_config_path", type=str, help="Inference configuration file (used for anomaly detection)"
     )
+    parser.add_argument(
+        "--train_classification_model_config_path", type=str, help="Configuration used for training the classification model")
+
     args = parser.parse_args()
 
-    generator = PredictionsClassifierModelGenerator(inference_config_path=args.inference_config_path)
+    generator = PredictionsClassifierModelGenerator(
+        inference_config_path=args.inference_config_path,
+        train_classification_model_config_path=args.train_classification_model_config_path
+    )
     generator.run()
 
 
