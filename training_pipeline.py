@@ -15,11 +15,13 @@ def main(*args, **kwargs):
     print("Number of ijepa training configs: ", len(ijepa_train_configs))
 
     train_distillation_configs = [ijepa_train_config.replace("train_ijepa", "train_distillation") for ijepa_train_config in ijepa_train_configs]
+    train_classifier_configs = [ijepa_train_config.replace("train_ijepa", "synthetic_anomaly_classifier") for ijepa_train_config in ijepa_train_configs]
 
-    for (ijepa_train_config, distillation_train_config) in zip(ijepa_train_configs, train_distillation_configs):
+    for (ijepa_train_config, distillation_train_config, classifier_train_config) in zip(ijepa_train_configs, train_distillation_configs, train_classifier_configs):
         scripts = [
             ["python3", "main.py", f"--fname={ijepa_train_config}"],
             ["python3", "-m", "src.train_distilled_model", f"--train_distillation_config_path={distillation_train_config}"]
+            ["python3" "-m", "src.train_synthetic_anomaly_classifier", f"--classifier_config_path={classifier_train_config}"]
         ]
 
         for cmd in scripts:

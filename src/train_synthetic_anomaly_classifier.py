@@ -113,9 +113,9 @@ class HeadClassifier(nn.Module):
         elif activation == "gelu":
             self.activ1 = nn.GELU()
 
-        self.fc2 = nn.Linear(hidden_size, 1)
         self.dropout = nn.Dropout(drop_rate)
-
+        self.fc2 = nn.Linear(hidden_size, 1)
+        
     def forward(self, x: torch.Tensor) -> torch.Tensor:        
         x1 = self.activ1(self.fc1(x))
         x1 = self.dropout(x1)
@@ -180,8 +180,12 @@ def train(args):
 
     train_loader = DataLoader(train_ds, batch_size=classifer_config.batch_size, shuffle=True,
                               num_workers=classifer_config.num_workers, pin_memory=True)
-    val_loader = DataLoader(val_ds, batch_size=classifer_config.batch_size, shuffle=False,
-                            num_workers=classifer_config.num_workers, pin_memory=True)
+    val_loader = DataLoader(
+        val_ds, 
+        batch_size=classifer_config.batch_size, 
+        shuffle=False,
+        num_workers=classifer_config.num_workers, pin_memory=True
+    )
 
     logger.info(f"Train samples: {len(train_ds)}, Val samples: {len(val_ds)}")
 
@@ -213,9 +217,16 @@ def train(args):
     ).to(device)
     
     optimizer = torch.optim.AdamW(
-        classifier.parameters(), 
-        lr=classifer_config.lr, 
+        classifier.parameters(),
+        lr=classifer_config.lr,
         weight_decay=classifer_config.weight_decay
+    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="max",
+        factor=classifer_config.scheduler_factor,
+        patience=classifer_config.scheduler_patience,
+        min_lr=classifer_config.scheduler_min_lr,
     )
     criterion = nn.BCEWithLogitsLoss()
 
@@ -247,11 +258,14 @@ def train(args):
 
         avg_loss = total_loss / len(train_ds)
         val_metrics = evaluate(target_encoder, classifier, val_loader, device)
+        scheduler.step(val_metrics["auroc"])
 
+        current_lr = optimizer.param_groups[0]["lr"]
         logger.info(
             f"Epoch {epoch + 1:3d} | loss={avg_loss:.4f} | "
             f"val AUROC={val_metrics['auroc']:.4f} | "
-            f"val balanced_acc={val_metrics['balanced_acc']:.4f}"
+            f"val balanced_acc={val_metrics['balanced_acc']:.4f} | "
+            f"lr={current_lr:.2e}"
         )
 
         if val_metrics["auroc"] > best_auroc:
