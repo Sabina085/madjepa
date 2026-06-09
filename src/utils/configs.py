@@ -268,11 +268,15 @@ class TrainSyntheticAnomalyClassifierConfig:
     batch_size: int
     drop_rate: float
     num_workers: int
+    scheduler_patience: int
+    scheduler_factor: float
+    scheduler_min_lr: float
 
 def read_train_synthetic_anomaly_classifier_config(config_path: str) -> TrainSyntheticAnomalyClassifierConfig:
     with open(config_path, "r") as f:
         yaml_dict = yaml.safe_load(f)
     config = TrainSyntheticAnomalyClassifierConfig()
+    opt = yaml_dict["optimization"]
 
     # data
     config.subset = yaml_dict["data"]["subset"]
@@ -283,11 +287,14 @@ def read_train_synthetic_anomaly_classifier_config(config_path: str) -> TrainSyn
     config.activation = yaml_dict["model"]["activation"]
 
     # optimization
-    config.num_epochs = int(yaml_dict["optimization"]["num_epochs"])
-    config.lr = float(yaml_dict["optimization"]["lr"])
-    config.weight_decay = float(yaml_dict["optimization"]["lr"])
-    config.batch_size = int(yaml_dict["optimization"]["batch_size"])
-    config.drop_rate = float(yaml_dict["optimization"]["drop_rate"])
-    config.num_workers = int(yaml_dict["optimization"]["num_workers"])
+    config.num_epochs = int(opt["num_epochs"])
+    config.lr = float(opt["lr"])
+    config.weight_decay = float(opt["weight_decay"])
+    config.batch_size = int(opt["batch_size"])
+    config.drop_rate = float(opt["drop_rate"])
+    config.num_workers = int(opt["num_workers"])
+    config.scheduler_patience = int(opt.get("scheduler_patience", 2))
+    config.scheduler_factor = float(opt.get("scheduler_factor", 0.5))
+    config.scheduler_min_lr = float(opt.get("scheduler_min_lr", 1e-5))
 
     return config

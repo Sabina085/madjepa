@@ -2,6 +2,7 @@ import glob
 import os
 import numpy as np
 import uuid
+import torch
 import json
 
 from PIL import Image
@@ -51,7 +52,7 @@ class SegmentationWithLabelDataset(Dataset):
         # crop the background border from the image
         image_arr = np.array(original_image)
 
-        if self.dataset_name in ["RESC", "OCT2017"]:
+        if self.dataset_name in ["RESC"]: #, "OCT2017"]:
             image_arr = remove_noise(image_arr)
 
         borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
@@ -71,11 +72,12 @@ class SegmentationWithLabelDataset(Dataset):
 
 class LabelDataset(Dataset):
     # This is a simpler version of the dataset. It does not include segmentation masks, only the image and the label.
-    def __init__(self, images_dir, dataset_name, count_border_pixels, transform=None):
+    def __init__(self, images_dir, dataset_name, count_border_pixels, transform=None, crop_background=True):
         self.images_dir = images_dir
         self.transform = transform
         self.dataset_name = dataset_name
         self.count_border_pixels = count_border_pixels
+        self.crop_background = crop_background
 
         # images
         self.all_paths = sorted(glob.glob(os.path.join(images_dir, "**/*.png"), recursive=True))
@@ -98,14 +100,19 @@ class LabelDataset(Dataset):
         # load label
         label = self.labels[idx]
 
-        # crop the background border from the image
-        image_arr = np.array(original_image)
+        if self.crop_background:
+            # crop the background border from the image
+            image_arr = np.array(original_image)
 
-        if self.dataset_name in ["RESC", "OCT2017"]:
-            image_arr = remove_noise(image_arr)
+            if self.dataset_name in ["RESC"]: #, "OCT2017"]:
+                image_arr = remove_noise(image_arr)
 
-        borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
-        image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
+            borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
+            image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
+        else:
+            image = original_image
+            # Setting borders_dict to a random tensor, as it won't be used when background cropping is disabled
+            borders_dict = torch.rand((1, 2))
         
         # apply transformations
         if self.transform:
@@ -138,7 +145,7 @@ class ImageDataset(Dataset):
         # crop the background border from the image
         image_arr = np.array(original_image)
 
-        if self.dataset_name in ["RESC", "OCT2017"]:
+        if self.dataset_name in ["RESC"]: #, "OCT2017"]:
             image_arr = remove_noise(image_arr)
 
         borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)

@@ -56,7 +56,7 @@ class PredictionsClassifierModelGenerator:
             f"results_{self.inference_anomaly_detection_config.split}",
             f"image_classifier_results_checkpoint_{self.classifier_hash_folder}",
         )
-        os.makedirs(self.save_classifier_results_folder, exist_ok=False)
+        os.makedirs(self.save_classifier_results_folder, exist_ok=True)
 
         if not torch.cuda.is_available():
             self.device = torch.device("cpu")
@@ -91,6 +91,7 @@ class PredictionsClassifierModelGenerator:
             dataset_name=self.inference_anomaly_detection_config.dataset_name,
             count_border_pixels=self.ijepa_train_config.count_border_pixels,
             transform=image_transform,
+            crop_background=False
         )
 
         eval_loader = torch.utils.data.DataLoader(
