@@ -20,8 +20,8 @@ def main(*args, **kwargs):
     for (ijepa_train_config, distillation_train_config, classifier_train_config) in zip(ijepa_train_configs, train_distillation_configs, train_classifier_configs):
         scripts = [
             ["python3", "main.py", f"--fname={ijepa_train_config}"],
-            ["python3", "-m", "src.train_distilled_model", f"--train_distillation_config_path={distillation_train_config}"]
-            ["python3" "-m", "src.train_synthetic_anomaly_classifier", f"--classifier_config_path={classifier_train_config}"]
+            ["python3", "-m", "src.train_distilled_model", f"--train_distillation_config_path={distillation_train_config}"],
+            ["python3", "-m", "src.train_synthetic_anomaly_classifier", f"--classifier_config_path={classifier_train_config}"]
         ]
 
         for cmd in scripts:

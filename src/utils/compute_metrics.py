@@ -3,7 +3,7 @@ import pandas as pd
 import json
 import seaborn as sns
 import matplotlib.pyplot as plt 
-from sklearn.metrics import roc_curve, roc_auc_score, RocCurveDisplay
+from sklearn.metrics import roc_auc_score, RocCurveDisplay
 
 sns.set_theme()
 
@@ -70,15 +70,13 @@ def compute_roc_auc_metrics(
 
     if segmentation_path:
         # Calculate per-pixel level ROCAUC
-        y_masks_gt = np.concatenate(gt_segmentations_list).astype('int')
-        y_amaps_pred = np.concatenate(anomaly_maps_list).astype('float32')
+        y_masks_gt = np.concatenate(gt_segmentations_list, dtype=np.uint8).ravel()
+        y_amaps_pred = np.concatenate(anomaly_maps_list, dtype=np.float32).ravel()
 
-        fpr_pixel, tpr_pixel, thresholds_pixel = roc_curve(
-        y_true=y_masks_gt.flatten(), y_score=y_amaps_pred.flatten())
+        del anomaly_maps_list, gt_segmentations_list
 
         pixel_roc_auc = roc_auc_score(
-            y_true=y_masks_gt.flatten(), y_score=y_amaps_pred.flatten()
-        )
+            y_true=y_masks_gt, y_score=y_amaps_pred)
     else:
          pixel_roc_auc = None
 
