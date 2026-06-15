@@ -42,6 +42,48 @@ def get_image_background_borders(image_arr: np.ndarray, count_border_pixels=2) -
         "original_image_width": num_cols
     }
 
+def convert_background_to_white_(
+    image_original: np.ndarray,
+    dataset: str,
+    closing_kernel_size: int = 5, 
+) -> np.ndarray:
+    if image_original.ndim == 3:
+        gray = image_original[:, :, 0]
+    else:
+        gray = image_original
+
+    if dataset.lower() == "hist_diy":
+        # Liver dataset - where the background is fully black
+        _, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY)
+    elif dataset.lower() == "resc":
+        # Otsu's Thresholding to separate the main object from the black background
+        # RESC dataset
+        _, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    kernel = np.ones((closing_kernel_size, closing_kernel_size), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)        
+
+    # Keep only the largest external contour (the main object)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return image_original
+
+    if dataset.lower() == "hist_diy":
+        # TODO: use flood fill function as we have separate components
+        largest_contour = max(contours, key=cv2.contourArea)
+    elif dataset.lower() == "resc":
+        largest_contour = max(contours, key=cv2.contourArea)
+
+    # Fill the contour so dark anomalies inside the main object stay part of the foreground
+    filled_mask = np.zeros_like(mask)
+    cv2.drawContours(filled_mask, [largest_contour], -1, 255, thickness=cv2.FILLED)
+
+    image_white_bg = image_original.copy()
+    image_white_bg[filled_mask == 0] = 255
+
+    return image_white_bg
+
+
 def remove_noise(image_original: np.ndarray):
     if image_original.ndim == 3:
         image = image_original[:, :, 0]

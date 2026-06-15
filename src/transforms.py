@@ -54,6 +54,13 @@ class CropBackgroundBordersTransform:
             image_arr = remove_noise(image_arr)
         borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
         cropped_img = image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
+        if self.dataset_name in ["RESC", "hist_DIY"]:
+            background_white_image = convert_background_to_white_(
+                image_original=np.asarray(cropped_img), 
+                closing_kernel_size=7,
+            dataset=self.dataset_name.lower())
+            cropped_img = Image.fromarray(background_white_image)
+
         # uid = uuid.uuid4()
         # image.save(f"Test_cropped_images_OCT2017/{uid}_original.jpg")
         # cropped_img.save(f"Test_cropped_images_OCT2017/{uid}_cropped.jpg")

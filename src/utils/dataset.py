@@ -58,6 +58,13 @@ class SegmentationWithLabelDataset(Dataset):
         borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
         image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
         
+        if self.dataset_name in ["RESC", "hist_DIY"]:
+            background_white_image = convert_background_to_white_(
+                image_original=np.asarray(image), 
+                closing_kernel_size=7,
+            dataset=self.dataset_name.lower())
+            image = Image.fromarray(background_white_image)
+
         # apply transformations
         if self.transform:
             image = self.transform(image)
@@ -113,6 +120,13 @@ class LabelDataset(Dataset):
             image = original_image
             # Setting borders_dict to a random tensor, as it won't be used when background cropping is disabled
             borders_dict = torch.rand((1, 2))
+
+        if self.dataset_name in ["RESC", "hist_DIY"]:
+            background_white_image = convert_background_to_white_(
+                image_original=np.asarray(image), 
+                closing_kernel_size=7,
+            dataset=self.dataset_name.lower())
+            image = Image.fromarray(background_white_image)
         
         # apply transformations
         if self.transform:
@@ -151,9 +165,15 @@ class ImageDataset(Dataset):
         borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
         image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
         
+        if self.dataset_name in ["RESC", "hist_DIY"]:
+            background_white_image = convert_background_to_white_(
+                image_original=np.asarray(image), 
+                closing_kernel_size=7,
+            dataset=self.dataset_name.lower())
+            image = Image.fromarray(background_white_image)
+
         # apply transformations
         if self.transform:
             image = self.transform(image)
 
         return image, img_name, borders_dict
-    

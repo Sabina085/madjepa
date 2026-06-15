@@ -78,6 +78,7 @@ def compute_roc_auc_metrics(
         pixel_roc_auc = roc_auc_score(
             y_true=y_masks_gt, y_score=y_amaps_pred)
     else:
+         # the current dataset does not have segmentation masks available
          pixel_roc_auc = None
 
     return {
