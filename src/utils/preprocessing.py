@@ -69,14 +69,14 @@ def convert_background_to_white(
         return image_original.copy()
 
     if dataset.lower() == "hist_diy":
-        # TODO: use flood fill function as we have separate components
-        largest_contour = max(contours, key=cv2.contourArea)
+        # There are samples where we have separate components, so we take all th identified foreground contours
+        filled_mask = np.zeros_like(mask)
+        cv2.drawContours(filled_mask, contours, -1, 255, thickness=cv2.FILLED)
     elif dataset.lower() == "resc":
         largest_contour = max(contours, key=cv2.contourArea)
-
-    # Fill the contour so dark anomalies inside the main object stay part of the foreground
-    filled_mask = np.zeros_like(mask)
-    cv2.drawContours(filled_mask, [largest_contour], -1, 255, thickness=cv2.FILLED)
+        # Fill the contour so dark anomalies inside the main object stay part of the foreground
+        filled_mask = np.zeros_like(mask)
+        cv2.drawContours(filled_mask, [largest_contour], -1, 255, thickness=cv2.FILLED)
 
     image_white_bg = image_original.copy()
 
