@@ -42,15 +42,15 @@ def get_image_background_borders(image_arr: np.ndarray, count_border_pixels=2) -
         "original_image_width": num_cols
     }
 
-def convert_background_to_white_(
+def convert_background_to_white(
     image_original: np.ndarray,
     dataset: str,
-    closing_kernel_size: int = 5, 
+    closing_kernel_size: int = 5,
 ) -> np.ndarray:
     if image_original.ndim == 3:
-        gray = image_original[:, :, 0]
+        gray = image_original[:, :, 0].copy()
     else:
-        gray = image_original
+        gray = image_original.copy()
 
     if dataset.lower() == "hist_diy":
         # Liver dataset - where the background is fully black
@@ -66,7 +66,7 @@ def convert_background_to_white_(
     # Keep only the largest external contour (the main object)
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
-        return image_original
+        return image_original.copy()
 
     if dataset.lower() == "hist_diy":
         # TODO: use flood fill function as we have separate components
@@ -80,25 +80,32 @@ def convert_background_to_white_(
 
     image_white_bg = image_original.copy()
     image_white_bg[filled_mask == 0] = 255
-
+    
     return image_white_bg
 
 
-def remove_noise(image_original: np.ndarray):
+def get_binary_threshold_map(image_original: np.ndarray, denoise_before=False):
     if image_original.ndim == 3:
-        image = image_original[:, :, 0]
+        gray = image_original[:, :, 0].copy()
     else:
-        image = image_original
+        gray = image_original.copy()
+
 
     # Otsu's Thresholding
     # This automatically finds the best threshold value to separate background from foreground
+    if denoise_before:
+        gray = cv2.GaussianBlur(gray, (5,5), 0)
+
     _, image_otsu = cv2.threshold(
-        image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+        gray, 
+        0,
+        255, 
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU
     )
 
     # Removes small "salt and pepper" noise from the thresholded mask
     kernel = np.ones((3,3), np.uint8)
     image_otsu = cv2.morphologyEx(image_otsu, cv2.MORPH_OPEN, kernel)
-    image_clean = cv2.medianBlur(image_otsu, 5)
+    binary_threshold_map = cv2.medianBlur(image_otsu, 5)
 
-    return image_clean
+    return binary_threshold_map
