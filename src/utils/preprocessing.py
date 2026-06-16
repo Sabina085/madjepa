@@ -79,6 +79,7 @@ def convert_background_to_white(
     cv2.drawContours(filled_mask, [largest_contour], -1, 255, thickness=cv2.FILLED)
 
     image_white_bg = image_original.copy()
+
     image_white_bg[filled_mask == 0] = 255
     
     return image_white_bg
@@ -94,10 +95,13 @@ def get_binary_threshold_map(image_original: np.ndarray, denoise_before=False):
     # Otsu's Thresholding
     # This automatically finds the best threshold value to separate background from foreground
     if denoise_before:
-        gray = cv2.GaussianBlur(gray, (5,5), 0)
+        blurred = cv2.GaussianBlur(gray, (5,5), 0)
+        # blurred = cv2.medianBlur(gray, 5)
+    else:
+        blurred = gray.copy()
 
     _, image_otsu = cv2.threshold(
-        gray, 
+        blurred, 
         0,
         255, 
         cv2.THRESH_BINARY + cv2.THRESH_OTSU
