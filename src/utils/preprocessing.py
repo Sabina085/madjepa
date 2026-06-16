@@ -91,7 +91,6 @@ def get_binary_threshold_map(image_original: np.ndarray, denoise_before=False):
     else:
         gray = image_original.copy()
 
-
     # Otsu's Thresholding
     # This automatically finds the best threshold value to separate background from foreground
     if denoise_before:

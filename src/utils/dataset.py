@@ -14,7 +14,14 @@ label2idx = {"good": 0, "ungood": 1}
 idx2label = {0: "good", 1: "ungood"}
 
 class SegmentationWithLabelDataset(Dataset):
-    def __init__(self, images_dir, dataset_name, count_border_pixels, transform=None, mask_transform=None):
+    def __init__(
+            self,
+            images_dir,
+            dataset_name,
+            count_border_pixels,
+            transform=None,
+            mask_transform=None):
+        
         self.images_dir = images_dir
         self.transform = transform
         self.mask_transform = mask_transform
@@ -53,12 +60,23 @@ class SegmentationWithLabelDataset(Dataset):
         image_arr = np.array(original_image)
 
         if self.dataset_name in ["RESC"]:
-            image_arr = get_binary_threshold_map(image_arr)
+            threshold_map = get_binary_threshold_map(image_arr)
+        else:
+            threshold_map = image_arr.copy()
 
-        borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
-        image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
+        borders_dict = get_image_background_borders(
+            image_arr=threshold_map,
+            count_border_pixels=self.count_border_pixels
+        )
+        image = original_image.crop(
+            box=(borders_dict["left"], 
+                 borders_dict["top"], 
+                 borders_dict["right"], 
+                 borders_dict["bottom"]
+            )
+        )
         
-        if self.dataset_name in ["RESC", "hist_DIY"]:
+        if self.dataset_name in ["hist_DIY"]:
             background_white_image = convert_background_to_white(
                 image_original=np.asarray(image),
                 closing_kernel_size=7,
@@ -112,16 +130,21 @@ class LabelDataset(Dataset):
             image_arr = np.array(original_image)
 
             if self.dataset_name in ["RESC"]:
-                image_arr = get_binary_threshold_map(image_arr)
+                threshold_map = get_binary_threshold_map(image_arr)
+            else:
+                threshold_map = image_arr.copy()
 
-            borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
+            borders_dict = get_image_background_borders(
+                image_arr=threshold_map,
+                count_border_pixels=self.count_border_pixels
+            )
             image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
         else:
             image = original_image
             # Setting borders_dict to a random tensor, as it won't be used when background cropping is disabled
             borders_dict = torch.rand((1, 2))
 
-        if self.dataset_name in ["RESC", "hist_DIY"]:
+        if self.dataset_name in ["hist_DIY"]:
             background_white_image = convert_background_to_white(
                 image_original=np.asarray(image),
                 closing_kernel_size=7,
@@ -159,12 +182,17 @@ class ImageDataset(Dataset):
         image_arr = np.array(original_image)
 
         if self.dataset_name in ["RESC"]:
-            image_arr = get_binary_threshold_map(image_arr)
+            threshold_map = get_binary_threshold_map(image_arr)
+        else:
+            threshold_map = image_arr.copy()
 
-        borders_dict = get_image_background_borders(image_arr=image_arr, count_border_pixels=self.count_border_pixels)
+        borders_dict = get_image_background_borders(
+            image_arr=threshold_map,
+            count_border_pixels=self.count_border_pixels
+        )
         image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
         
-        if self.dataset_name in ["RESC", "hist_DIY"]:
+        if self.dataset_name in ["hist_DIY"]:
             background_white_image = convert_background_to_white(
                 image_original=np.asarray(image),
                 closing_kernel_size=7,
