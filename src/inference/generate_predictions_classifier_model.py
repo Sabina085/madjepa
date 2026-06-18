@@ -86,11 +86,13 @@ class PredictionsClassifierModelGenerator:
         ])
 
 
+        crop_background = self.inference_anomaly_detection_config.dataset_name in ["hist_DIY"]
         eval_dataset = LabelDataset(
             images_dir=self.evaluation_dataset_path,
             dataset_name=self.inference_anomaly_detection_config.dataset_name,
             count_border_pixels=self.ijepa_train_config.count_border_pixels,
             transform=image_transform,
+            crop_background=crop_background
         )
 
         eval_loader = torch.utils.data.DataLoader(

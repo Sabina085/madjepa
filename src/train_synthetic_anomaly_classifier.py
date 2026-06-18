@@ -166,14 +166,18 @@ def train(args):
     ijepa_train_config_path = os.path.join(experiment_folder_path, "logs/config_run.yaml")
     ijepa_train_config = read_train_ijepa_config(ijepa_train_config_path)
 
-
-    # build image transform (same stats as I-JEPA training)
-    image_transform = transforms.Compose([
-        CropBackgroundBordersTransform(classifer_config.subset, ijepa_train_config.count_border_pixels),
+    # image transforms (same stats as I-JEPA training)
+    transforms_list = []
+    if classifer_config.subset in ["hist_DIY"]:
+        transforms_list.append(
+            CropBackgroundBordersTransform(classifer_config.subset, ijepa_train_config.count_border_pixels))
+        
+    transforms_list += [
         transforms.Resize((ijepa_train_config.crop_size, ijepa_train_config.crop_size), Image.BICUBIC),
         transforms.ToTensor(),
         transforms.Normalize(mean=ijepa_train_config.transform_mean, std=ijepa_train_config.transform_std),
-    ])
+    ]
+    image_transform = transforms.Compose(transforms_list)
 
     # -- datasets & loaders
     logger.info(f"Loading datasets for subset: {classifer_config.subset}")
