@@ -91,7 +91,6 @@ class PredictionsClassifierModelGenerator:
             dataset_name=self.inference_anomaly_detection_config.dataset_name,
             count_border_pixels=self.ijepa_train_config.count_border_pixels,
             transform=image_transform,
-            crop_background=False
         )
 
         eval_loader = torch.utils.data.DataLoader(

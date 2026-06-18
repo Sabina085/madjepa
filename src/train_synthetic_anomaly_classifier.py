@@ -30,6 +30,7 @@ from tqdm import tqdm
 import datasets as hf_datasets
 
 from src.helper import convert_from_ddp_to_normal_state_dict, target_encoder_forward_dinov3
+from src.transforms import CropBackgroundBordersTransform
 from src.utils.configs import read_train_ijepa_config, read_train_synthetic_anomaly_classifier_config
 from instance_specific_config import ROOT_DIRECTORY_EXPERIMENTS_PATH
 
@@ -168,6 +169,7 @@ def train(args):
 
     # build image transform (same stats as I-JEPA training)
     image_transform = transforms.Compose([
+        CropBackgroundBordersTransform(classifer_config.subset, ijepa_train_config.count_border_pixels),
         transforms.Resize((ijepa_train_config.crop_size, ijepa_train_config.crop_size), Image.BICUBIC),
         transforms.ToTensor(),
         transforms.Normalize(mean=ijepa_train_config.transform_mean, std=ijepa_train_config.transform_std),
