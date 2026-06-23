@@ -226,7 +226,6 @@ class AnomalyMapsBuilder:
             with open(saved_borders_dict_path, "r") as f:
                 borders_dict = json.load(f)
 
-            # TODO - why scaling the borders using the min, max of the anomaly map without borders
             anomaly_map = build_anomaly_map_with_borders(
                 per_patch_distances_dict=results_distances_dict,
                 patch_size=self.train_config.patch_size,

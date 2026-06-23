@@ -78,12 +78,6 @@ class TrainClassificationDataset(_BMADBase, Dataset):
 
 
 class EvalClassificationDataset(_BMADBase, Dataset):
-    """
-    Labelled (image, label) dataset for val or test splits.
-
-    label = 0 for 'good' samples, label = 1 for all anomaly classes.
-    """
-
     def __init__(self, split: str, subset: str, transform):
         self.transform = transform
         hf_split = "validation" if split == "val" else split
@@ -289,8 +283,7 @@ def train(args):
             logger.info(f"  -> New best saved (AUROC={best_auroc:.4f}) to {os.path.join(classifier_save_path, f"{classification_model_hash}-classifier-latest-{round(val_metrics['auroc'] * 100, 2)}.pth")}")
 
     logger.info(f"Training done. Best val AUROC={best_auroc:.4f} at epoch {best_epoch}.")
-
-
+    
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train a linear classifier on BMAD synthetic anomaly dataset")

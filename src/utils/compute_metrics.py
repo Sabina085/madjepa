@@ -1,9 +1,12 @@
 import numpy as np
 import pandas as pd
 import json
+import cv2
 import seaborn as sns
 import matplotlib.pyplot as plt 
 from sklearn.metrics import roc_auc_score, RocCurveDisplay
+from PIL import Image
+from src.utils.anomaly_maps import cvt2heatmap
 
 sns.set_theme()
 
@@ -33,6 +36,26 @@ def compute_roc_auc_metrics(
             classification_score = float(json.load(f)["score"])
 
         anomaly_map = anomaly_map * (1 - weight_distillation) + anomaly_map_distillation * weight_distillation
+
+        # Saving the aggregated anomaly map (I-Jepa + distillation) and the heatmap
+        anomaly_map_image_path = anomaly_map_path.replace("_arrays_", "_images_").replace(".npy", ".png")
+        agg_anomaly_map_path  = anomaly_map_image_path.replace("_anomaly_map_", "_aggregated_anomaly_map_")
+        agg_anomaly_map_path = agg_anomaly_map_path.split(".png")[0] + "_" + str(weight_distillation) + ".png"
+        
+        Image.fromarray((255 * anomaly_map) \
+            .astype("uint8")) \
+            .convert("L") \
+            .save(agg_anomaly_map_path)
+        
+        # Convert the anomaly map into a heatmap and superimpose it on the initial image
+        heatmap_agg_anomaly_map = cvt2heatmap((anomaly_map * 255).astype(np.uint8))
+        heatmap_agg_anomaly_map_path = agg_anomaly_map_path.replace("_aggregated_anomaly_map_", "_").split(".png")[0] + "_aggregated_heatmap_" + str(weight_distillation) + ".png"
+
+        initial_image = cv2.imread(anomaly_map_image_path.replace("_anomaly_map_", "_").split(".png")[0] + "_original.png")
+        initial_image = (initial_image * 255).astype(np.uint8)
+
+        heatmap_agg_anomaly_map = cv2.addWeighted(heatmap_agg_anomaly_map, 0.4, initial_image, (1 - 0.4), 0)
+        cv2.imwrite(heatmap_agg_anomaly_map_path, heatmap_agg_anomaly_map)
 
         # for computing an image level ROCAUC
         # compute an anomaly score at image level
