@@ -1,0 +1,20 @@
+# Inference configuration for BraTS2021_slice dataset
+
+data:
+  dataset_name: "Chest-RSNA"
+  experiment_name: "experiment_1"
+  split: "test"
+
+inference:
+  # How many random target boxes to sample per image
+  num_sampled_random_boxes_per_image: 30
+  distance: "l2"
+  aggregate_patches_strategy: "max"
+  gaussian_filter_blur_sigma_ijepa: 4
+  gaussian_filter_blur_sigma_distillation: 4
+  # For computing the image-level metrics
+  image_statistic_for_classification: "mean"
+
+misc:
+  # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
+  save_images_with_masks: False

@@ -1,0 +1,15 @@
+data:
+    subset: Chest
+    experiment_name: experiments_Chest-RSNA/experiment_1
+
+model:
+  hidden_size: 128
+  activation: "gelu"
+
+optimization: 
+  num_epochs: 20
+  lr: 1e-4
+  weight_decay: 1e-1
+  batch_size: 64
+  num_workers: 8
+  drop_rate: 0.3
