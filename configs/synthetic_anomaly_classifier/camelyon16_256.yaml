@@ -1,0 +1,15 @@
+data:
+    subset: camelyon
+    experiment_name: experiments_camelyon16_256/experiment_1
+
+model:
+  hidden_size: 128
+  activation: "gelu"
+
+optimization: 
+  num_epochs: 20
+  lr: 1e-3
+  weight_decay: 1e-4
+  batch_size: 64
+  drop_rate: 0.1
+  num_workers: 8
