@@ -224,7 +224,6 @@ pretrained_checkpoints/
 Test_cropped_images*
 Test_cropped_images/*
 test_test/*
-configs/*
 *.txt
 
 # Venv
