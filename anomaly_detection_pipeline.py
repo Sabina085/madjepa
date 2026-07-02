@@ -4,18 +4,35 @@ from pathlib import Path
 import os
 import argparse
 import yaml
+import time
 from instance_specific_config import ROOT_DIRECTORY_EXPERIMENTS_PATH
 
-DISTILLATION_MODEL_HASH = "*" # default value - retrieve the only checkpoint available for the experiment indicated in inference config
 
 def main(*args, **kwargs):
     parser = argparse.ArgumentParser(description="Pattern for the inference configuration files")
     parser.add_argument(
         "--inference_config_pattern_path", type=str, help="Pattern for the inference configuration files"
     )
+
+    parser.add_argument(
+        "--distillation_model_hash", type=str, default="*", help="Distilled model hash. Default = * (the only checkpoint available for the experiment indicated in the inference config)"
+    )
+
+    parser.add_argument(
+        "--weight_distillation_test", type=float, default=0.0, help="Weight of the distilled model to use on the test set (best value identified on the validation set). Required only for computing the results on the test set."
+    )
+
+    parser.add_argument(
+        "--weight_classification_test", type=float, default=0.0, help="Weight of the classifier model to use on the test set (best value identified on the validation set). Required only for computing the results on the test set."
+    )
+
     args = parser.parse_args()
+    distillation_model_hash = str(args.distillation_model_hash)
+    weight_distillation_test = float(args.weight_distillation_test)
+    weight_classification_test = float(args.weight_classification_test)
     inference_configs = sorted(glob.glob(args.inference_config_pattern_path))
     print("Number of inference configs: ", len(inference_configs))
+    # time.sleep(1800)
 
     for inference_config_path in inference_configs:
         print("Inference config: ", inference_config_path)
@@ -27,7 +44,7 @@ def main(*args, **kwargs):
 
         # Distilled model
         train_distillation_config_path = glob.glob(
-            f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/experiments_{dataset_name}/{experiment_name}/checkpoints_distilled_model/{DISTILLATION_MODEL_HASH}/config.yaml")[0]    
+            f"{ROOT_DIRECTORY_EXPERIMENTS_PATH}/experiments_{dataset_name}/{experiment_name}/checkpoints_distilled_model/{distillation_model_hash}/config.yaml")[0]    
         print("Train distillation config path: ", train_distillation_config_path)
 
         # Classifier model
@@ -49,7 +66,7 @@ def main(*args, **kwargs):
         print("train_classifier_config_path: ", train_classifier_config_path)
 
         scripts = [
-            # generate predictions
+            # generate prsedictions
             ["python3", "-m", "src.inference.generate_predictions_random_boxes", f"--inference_config_path={inference_config_path}"],
             ["python3", "-m", "src.inference.generate_predictions_distilled_model", f"--inference_config_path={inference_config_path}", f"--train_distilled_model_config_path={train_distillation_config_path}"],
             ["python3", "-m", "src.inference.generate_predictions_classifier_model", f"--inference_config_path={inference_config_path}", f"--train_classification_model_config_path={train_classifier_config_path}"],
@@ -57,52 +74,32 @@ def main(*args, **kwargs):
             # generate anomaly maps
             ["python3", "-m", "src.evaluation.build_anomaly_maps", f"--inference_config_path={inference_config_path}"],
             ["python3", "-m", "src.evaluation.build_anomaly_maps", f"--inference_config_path={inference_config_path}", "--use_distillation_model", f"--train_distilled_model_config_path={train_distillation_config_path}"],
-            
-            # Compute the anomaly detection results
 
-            # Vary the weight_distillation, weight_classification=0.0
+            # ijepa model only
             ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.0","--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5","--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
+            # distilled model only
             ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=1.0","--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.05","--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.1", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.15", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.2", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.25", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.3", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.35", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.4", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.45", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.6", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.7", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.75", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.8", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.85", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.9", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.95", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.91", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.92", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.93", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.94", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.89", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.88", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.87", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            # ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.86", "--weight_classification=0.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-        
-            # Vary the weight_classificaton, weight_distillation is fixed
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5", "--weight_classification=0.1", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5", "--weight_classification=0.2", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5", "--weight_classification=0.3", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5", "--weight_classification=0.4", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5", "--weight_classification=0.5", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5", "--weight_classification=0.6", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5", "--weight_classification=0.7", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5", "--weight_classification=0.8", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5", "--weight_classification=0.9", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
-            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.5", "--weight_classification=1.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"]
+            # pseudo-anomaly classifier model only
+            ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", "--weight_distillation=0.0","--weight_classification=1.0", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"],
         ]
 
+        # Compute the anomaly detection results
+        if inference_config["data"]["split"] == "valid":
+            # Validation set - vary both the distilled model weight and the classifier model weight
+            weights_distillation = [round(0.05 * x, 2) for x in range(0, 20)]
+            weights_classification = [round(0.05 * x, 2) for x in range(0, 20)]
+
+            for weight_distillation in weights_distillation:
+                for weight_classification in weights_classification:
+                    scripts.append(
+                        ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", f"--weight_distillation={weight_distillation}", f"--weight_classification={weight_classification}", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"]
+                    )
+        else:
+            # Test set - compute performance using the best weight_distillation_test and weight_classification_test previously identified on the validation set
+            scripts.append(
+                ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", f"--weight_distillation={weight_distillation_test}", f"--weight_classification={weight_classification_test}", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"]
+            )
+            
         for cmd in scripts:
             print(f"Running: {' '.join(cmd)}")
             result = subprocess.run(cmd)
