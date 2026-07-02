@@ -28,6 +28,7 @@ from torchvision import transforms
 from tqdm import tqdm
 
 import datasets as hf_datasets
+import torch.nn.functional as F
 
 from src.helper import convert_from_ddp_to_normal_state_dict, target_encoder_forward_dinov3
 from src.transforms import CropBackgroundBordersTransform
@@ -120,20 +121,27 @@ class HeadClassifier(nn.Module):
 
 
 @torch.no_grad()
-def extract_features(encoder, images: torch.Tensor) -> torch.Tensor:
+def extract_features(encoder, images: torch.Tensor, layer_norm_teacher) -> torch.Tensor:
     # Run frozen target encoder and mean-pool patch tokens → [B, D]
     patch_tokens = encoder(images)   # [B, N, D]
+
+    if layer_norm_teacher:
+        patch_tokens = F.layer_norm(patch_tokens, (patch_tokens.size(-1),))  # normalize over feature-dim
 
     return patch_tokens.mean(dim=1)  # [B, D]
 
 
 @torch.no_grad()
-def evaluate(encoder, classifier, loader, device) -> dict:
+def evaluate(encoder, classifier, loader, device, layer_norm_teacher) -> dict:
     classifier.eval()
     all_logits, all_labels = [], []
     for images, labels in loader:
         images = images.to(device)
-        features = extract_features(encoder, images)
+        features = extract_features(
+            encoder, 
+            images, 
+            layer_norm_teacher=layer_norm_teacher
+        )
         logits = classifier(features)
         all_logits.append(logits.cpu())
         all_labels.append(labels)
@@ -248,7 +256,11 @@ def train(args):
 
         for images, labels in tqdm(train_loader, desc=f"Epoch {epoch + 1}/{classifer_config.num_epochs}"):
             images, labels = images.to(device), labels.to(device)
-            features = extract_features(target_encoder, images)
+            features = extract_features(
+                target_encoder, 
+                images, 
+                layer_norm_teacher=ijepa_train_config.layer_norm_teacher
+            )
             logits = classifier(features)
             loss = criterion(logits, labels)
             optimizer.zero_grad()
@@ -257,7 +269,13 @@ def train(args):
             total_loss += loss.item() * len(images)
 
         avg_loss = total_loss / len(train_ds)
-        val_metrics = evaluate(target_encoder, classifier, val_loader, device)
+        val_metrics = evaluate(
+            target_encoder, 
+            classifier, 
+            val_loader, 
+            device, 
+            layer_norm_teacher=ijepa_train_config.layer_norm_teacher
+        )
         scheduler.step(val_metrics["auroc"])
 
         current_lr = optimizer.param_groups[0]["lr"]

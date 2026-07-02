@@ -157,7 +157,7 @@ class PredictionsClassifierModelGenerator:
                 label = label.detach().cpu().item()
                 image_name = image_name[0].split('.')[0]
 
-                features = extract_features(target_encoder, image)
+                features = extract_features(target_encoder, image, layer_norm_teacher=self.ijepa_train_config.layer_norm_teacher)
                 logit = classifier(features)
                 score = torch.sigmoid(logit).item()
 
