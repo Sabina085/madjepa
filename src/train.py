@@ -111,7 +111,7 @@ def main(*args, **kwargs):
     os.makedirs(checkpoint_folder, exist_ok=False)
 
     save_path = os.path.join(checkpoint_folder, f'{config.tag}' + '-epoch{epoch}.pth.tar')
-    latest_path = os.path.join(checkpoint_folder, f'{config.tag}-latest.pth.tar')
+    best_valid_checkpoint_path = os.path.join(checkpoint_folder, f'{config.tag}-best-valid-checkpoint.pth.tar')
     if config.load_checkpoint_path:
         load_path = Path(config.load_checkpoint_path)
     else:
@@ -170,6 +170,20 @@ def main(*args, **kwargs):
         allow_overlap=config.allow_overlap,
         min_keep=config.enc_min_keep)
 
+    # Separate collator instance for validation so that validation batches don't
+    # advance the training collator's shared step counter (which seeds mask block-size
+    # sampling) - keeps the train-time mask schedule identical to a validation-free run.
+    valid_mask_collator = MBMaskCollator(
+        input_size=config.crop_size,
+        patch_size=config.patch_size,
+        pred_mask_scale=config.target_block_scale,
+        enc_mask_scale=config.enc_mask_scale,
+        aspect_ratio=config.target_block_aspect_ratio,
+        nenc=config.num_enc_masks,
+        npred=config.num_pred_masks,
+        allow_overlap=config.allow_overlap,
+        min_keep=config.enc_min_keep)
+
     transform = make_transforms(
         crop_size=config.crop_size,
         crop_scale=config.crop_scale,
@@ -201,7 +215,7 @@ def main(*args, **kwargs):
         _, valid_unsupervised_loader, _ = make_brain_mri(
                 transform=transform,
                 batch_size=config.batch_size,
-                collator=mask_collator,
+                collator=valid_mask_collator,
                 pin_mem=config.pin_mem,
                 num_workers=config.num_workers,
                 world_size=world_size,
@@ -230,7 +244,7 @@ def main(*args, **kwargs):
         _, valid_unsupervised_loader, _ = make_liver_ct(
                 transform=transform,
                 batch_size=config.batch_size,
-                collator=mask_collator,
+                collator=valid_mask_collator,
                 pin_mem=config.pin_mem,
                 num_workers=config.num_workers,
                 world_size=world_size,
@@ -259,7 +273,7 @@ def main(*args, **kwargs):
         _, valid_unsupervised_loader, _ = make_resc(
                 transform=transform,
                 batch_size=config.batch_size,
-                collator=mask_collator,
+                collator=valid_mask_collator,
                 pin_mem=config.pin_mem,
                 num_workers=config.num_workers,
                 world_size=world_size,
@@ -288,7 +302,7 @@ def main(*args, **kwargs):
         _, valid_unsupervised_loader, _ = make_oct2017(
                 transform=transform,
                 batch_size=config.batch_size,
-                collator=mask_collator,
+                collator=valid_mask_collator,
                 pin_mem=config.pin_mem,
                 num_workers=config.num_workers,
                 world_size=world_size,
@@ -317,7 +331,7 @@ def main(*args, **kwargs):
         _, valid_unsupervised_loader, _ = make_chest_rsna(
                 transform=transform,
                 batch_size=config.batch_size,
-                collator=mask_collator,
+                collator=valid_mask_collator,
                 pin_mem=config.pin_mem,
                 num_workers=config.num_workers,
                 world_size=world_size,
@@ -345,7 +359,7 @@ def main(*args, **kwargs):
         _, valid_unsupervised_loader, _ = make_camelyon(
                 transform=transform,
                 batch_size=config.batch_size,
-                collator=mask_collator,
+                collator=valid_mask_collator,
                 pin_mem=config.pin_mem,
                 num_workers=config.num_workers,
                 world_size=world_size,
@@ -421,7 +435,7 @@ def main(*args, **kwargs):
     for p in target_encoder.parameters():
         p.requires_grad = False
 
-    def save_checkpoint(epoch):
+    def save_checkpoint(epoch, save_path):
         save_dict = {
             'encoder': encoder.state_dict(),
             'predictor': predictor.state_dict(),
@@ -443,7 +457,7 @@ def main(*args, **kwargs):
             save_dict["target_encoder_weights_source"] = config.target_encoder_weights_source
 
         if rank == 0:
-            torch.save(save_dict, latest_path)
+            torch.save(save_dict, save_path)
 
     # For early stopping
     best_valid_loss = float('inf')
@@ -483,7 +497,6 @@ def main(*args, **kwargs):
                 def forward_target():
                     with torch.no_grad():
                         h = target_encoder.forward(imgs)
-                        # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
                         if config.layer_norm_teacher:
                             h = F.layer_norm(h, (h.size(-1),))  # normalize over feature-dim
                         B = len(h)
@@ -575,7 +588,6 @@ def main(*args, **kwargs):
                 valid_masks_pred = [u.to(device, non_blocking=True) for u in valid_masks_pred]
 
                 h_valid = target_encoder.forward(valid_imgs)
-                # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
                 if config.layer_norm_teacher:
                     h_valid = F.layer_norm(h_valid, (h_valid.size(-1),))  # normalize over feature-dim
                 B = len(h_valid)
@@ -599,12 +611,18 @@ def main(*args, **kwargs):
         if avg_valid_loss_epoch < best_valid_loss:
             best_valid_loss = avg_valid_loss_epoch
             best_epoch = epoch
-            print(f"Saving the checkpoint at {latest_path}")
-            save_checkpoint(epoch + 1)
+            print(f"Saving the checkpoint at {best_valid_checkpoint_path}")
+            save_checkpoint(epoch + 1, best_valid_checkpoint_path)
         else:
             if epoch - best_epoch >= config.patience:
                 logger.info(f"The validation loss did not decrease in the last {config.patience} epochs. Stopping the training.")
                 break
+
+        if (epoch + 1) % 5 == 0:
+            latest_path = os.path.join(checkpoint_folder, f'{config.tag}-epoch-{epoch + 1}.pth.tar')
+            print(f"Saving the checkpoint at {latest_path}")
+            save_checkpoint(epoch + 1, latest_path)
+
 
         torch.cuda.empty_cache()
 

@@ -167,6 +167,7 @@ class InferenceAnomalyDetectionConfig():
    gaussian_filter_blur_sigma_ijepa: int
    gaussian_filter_blur_sigma_distillation: int
    image_statistic_for_classification: str
+   global_seed_random_boxes: int
 
    # --- misc
    save_images_with_masks: bool
@@ -191,6 +192,7 @@ def read_inference_anomaly_detection_config(config_path: str) -> InferenceAnomal
     config.gaussian_filter_blur_sigma_distillation = yaml_dict["inference"]["gaussian_filter_blur_sigma_distillation"]
     # For computing the image-level metrics
     config.image_statistic_for_classification = yaml_dict["inference"]["image_statistic_for_classification"]
+    config.global_seed_random_boxes = yaml_dict["inference"].get("global_seed_random_boxes", 0)
 
     # --- misc
     # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)

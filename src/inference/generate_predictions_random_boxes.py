@@ -74,7 +74,8 @@ class PredictionsRandomBoxesGenerator:
         self.save_per_patch_results_folder = (
             f"{self.experiment_folder_path}/"
             f"image_per_patch_{self.inference_config.distance}_distances_"
-            f"{self.inference_config.num_sampled_random_boxes_per_image}_seeds/"
+            f"{self.inference_config.num_sampled_random_boxes_per_image}_seeds_"
+            f"global_seed_{self.inference_config.global_seed_random_boxes}/"
         )
 
         self.save_cropped_borders_dict_folder = (
@@ -350,7 +351,7 @@ class PredictionsRandomBoxesGenerator:
             predictor.eval()
 
             for box_idx in tqdm(range(self.inference_config.num_sampled_random_boxes_per_image)):
-                seed = box_idx
+                seed = box_idx + self.inference_config.global_seed_random_boxes
                 torch_generator.manual_seed(seed)
 
                 target_block_h, target_block_w = mask_collator._sample_block_size(
@@ -382,7 +383,6 @@ class PredictionsRandomBoxesGenerator:
                         # --- Target encoder forward prop
                         # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
                         target_encoder_emb = target_encoder(image)
-                        # We do not need this anymore as we're already applying a layer normalization at the end of the target encoder forward function
                         if self.train_config.layer_norm_teacher:
                             target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
                         # retrieve the batch size

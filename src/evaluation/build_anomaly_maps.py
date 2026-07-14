@@ -46,8 +46,9 @@ class AnomalyMapsBuilder:
                 f"{self.experiment_folder_path}/"
                 f"anomaly_maps_arrays_{self.inference_config.distance}_distance_"
                 f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
-                f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_sigma_"
-                f"{self.inference_config.gaussian_filter_blur_sigma_ijepa}"
+                f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
+                f"sigma_{self.inference_config.gaussian_filter_blur_sigma_ijepa}_"
+                f"global_seed_{self.inference_config.global_seed_random_boxes}"
             )
 
             self.anomaly_maps_images_path = (
@@ -55,13 +56,15 @@ class AnomalyMapsBuilder:
                 f"anomaly_maps_images_{self.inference_config.distance}_distance_"
                 f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
                 f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
-                f"sigma_{self.inference_config.gaussian_filter_blur_sigma_ijepa}"
+                f"sigma_{self.inference_config.gaussian_filter_blur_sigma_ijepa}_"
+                f"global_seed_{self.inference_config.global_seed_random_boxes}"
             )
 
             self.saved_dicts_folder = (
                 f"{self.experiment_folder_path}/"
                 f"image_per_patch_{self.inference_config.distance}_distances_"
-                f"{self.inference_config.num_sampled_random_boxes_per_image}_seeds"
+                f"{self.inference_config.num_sampled_random_boxes_per_image}_seeds_"
+                f"global_seed_{self.inference_config.global_seed_random_boxes}"
             )
         else:
             # computing the anomaly boxes using the distillation model output

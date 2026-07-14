@@ -72,7 +72,7 @@ def convert_background_to_white(
         # There are samples where we have separate components, so we take all th identified foreground contours
         filled_mask = np.zeros_like(mask)
         cv2.drawContours(filled_mask, contours, -1, 255, thickness=cv2.FILLED)
-    elif dataset.lower() == "resc":
+    else:
         largest_contour = max(contours, key=cv2.contourArea)
         # Fill the contour so dark anomalies inside the main object stay part of the foreground
         filled_mask = np.zeros_like(mask)

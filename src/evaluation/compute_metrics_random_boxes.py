@@ -33,7 +33,8 @@ class MetricsComputer:
             f"anomaly_maps_arrays_{self.inference_config.distance}_distance_"
             f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
-            f"sigma_{self.inference_config.gaussian_filter_blur_sigma_ijepa}"
+            f"sigma_{self.inference_config.gaussian_filter_blur_sigma_ijepa}_"
+            f"global_seed_{self.inference_config.global_seed_random_boxes}"
         )
 
         # Distilled model anomaly maps
@@ -60,6 +61,7 @@ class MetricsComputer:
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
             f"sigma_ijepa_{self.inference_config.gaussian_filter_blur_sigma_ijepa}_"
             f"sigma_distillation_{self.inference_config.gaussian_filter_blur_sigma_distillation}_"
+            f"global_seed_{self.inference_config.global_seed_random_boxes}_"
             f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
             f"_checkpoint_{self.distilled_model_hash_folder}"
             f"_distillation_weight_{self.weight_distillation}"
@@ -72,6 +74,7 @@ class MetricsComputer:
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
             f"sigma_ijepa_{self.inference_config.gaussian_filter_blur_sigma_ijepa}_"
             f"sigma_distillation_{self.inference_config.gaussian_filter_blur_sigma_distillation}_"
+            f"global_seed_{self.inference_config.global_seed_random_boxes}_"
             f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
             f"_checkpoint_{self.distilled_model_hash_folder}"
             f"_distillation_weight_{self.weight_distillation}"
@@ -82,8 +85,9 @@ class MetricsComputer:
             f"{self.metrics_folder}/roc_plot_{self.inference_config.distance}_distance_"
             f"{self.inference_config.aggregate_patches_strategy}_agg_strategy_"
             f"{self.inference_config.num_sampled_random_boxes_per_image}_boxes_"
-            f"sigma_ijepa_{self.inference_config.gaussian_filter_blur_sigma_ijepa}"
-            f"sigma_distillation_{self.inference_config.gaussian_filter_blur_sigma_distillation}"
+            f"sigma_ijepa_{self.inference_config.gaussian_filter_blur_sigma_ijepa}_"
+            f"sigma_distillation_{self.inference_config.gaussian_filter_blur_sigma_distillation}_"
+            f"global_seed_{self.inference_config.global_seed_random_boxes}_"
             f"_per_image_statistic_{self.inference_config.image_statistic_for_classification}"
             f"_checkpoint_{self.distilled_model_hash_folder}"
             f"_distillation_weight_{self.weight_distillation}"
@@ -152,7 +156,8 @@ class MetricsComputer:
                 "WEIGHT_DISTILLATION": [self.weight_distillation],
                 "WEIGHT_CLASSIFICATION": [self.weight_classification],
                 "EXPERIMENT_NAME": [self.inference_config.experiment_name],
-                "DISTILLED_MODEL_HASH": [self.distilled_model_hash_folder]
+                "DISTILLED_MODEL_HASH": [self.distilled_model_hash_folder],
+                "GLOBAL_SEED_RANDOM_BOXES": [self.inference_config.global_seed_random_boxes]
             }
         ) 
         metrics_df.to_csv(self.metrics_path, index=False)
