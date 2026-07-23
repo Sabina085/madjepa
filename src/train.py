@@ -172,7 +172,7 @@ def main(*args, **kwargs):
 
     # Separate collator instance for validation so that validation batches don't
     # advance the training collator's shared step counter (which seeds mask block-size
-    # sampling) - keeps the train-time mask schedule identical to a validation-free run.
+    # sampling)
     valid_mask_collator = MBMaskCollator(
         input_size=config.crop_size,
         patch_size=config.patch_size,

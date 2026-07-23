@@ -76,8 +76,7 @@ class SegmentationWithLabelDataset(Dataset):
             )
         )
         
-        # if self.dataset_name in ["hist_DIY"]:
-        if self.dataset_name in ["no_bg_conv"]:
+        if self.dataset_name in ["hist_DIY"]:
             background_white_image = convert_background_to_white(
                 image_original=np.asarray(image),
                 closing_kernel_size=7,
@@ -145,8 +144,7 @@ class LabelDataset(Dataset):
             # Setting borders_dict to a random tensor, as it won't be used when background cropping is disabled
             borders_dict = torch.rand((1, 2))
 
-        # if self.dataset_name in ["hist_DIY"]:
-        if self.dataset_name in ["no_bg_conv"]:
+        if self.dataset_name in ["hist_DIY"]:
             background_white_image = convert_background_to_white(
                 image_original=np.asarray(image),
                 closing_kernel_size=7,
@@ -194,8 +192,7 @@ class ImageDataset(Dataset):
         )
         image = original_image.crop(box=(borders_dict["left"], borders_dict["top"], borders_dict["right"], borders_dict["bottom"]))
         
-        # if self.dataset_name in ["hist_DIY"]:
-        if self.dataset_name in ["no_bg_conv"]:
+        if self.dataset_name in ["hist_DIY"]:
             background_white_image = convert_background_to_white(
                 image_original=np.asarray(image),
                 closing_kernel_size=7,

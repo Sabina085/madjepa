@@ -68,8 +68,7 @@ class CropBackgroundBordersTransform:
                 borders_dict["bottom"]
             ))
         
-        # if self.dataset_name in ["hist_DIY"]:
-        if self.dataset_name in ["no_bg_conv"]:
+        if self.dataset_name in ["hist_DIY"]:
             background_white_image = convert_background_to_white(
                 image_original=np.asarray(cropped_img), 
                 closing_kernel_size=7,
