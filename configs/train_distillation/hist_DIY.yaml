@@ -1,6 +1,6 @@
 data:
     dataset_name: hist_DIY
-    experiment_name: experiment_default_hyparams_early_stopping
+    experiment_name: experiment_1_white_background
 
 model:
     hidden_size: 384
@@ -17,3 +17,6 @@ optimization:
     final_lr: 1e-5
     weight_decay: 0.05
     patience: 10 # epochs
+    hidden_dropout_prob: 0.0
+    layer_norm: False
+    normalize_before_computing_distance: True

@@ -1,0 +1,15 @@
+data:
+    subset: hist_DIY
+    experiment_name: experiments_hist_DIY/experiment_1_white_background
+
+model:
+  hidden_size: 128
+  activation: "gelu"
+
+optimization:
+  num_epochs: 20
+  lr: 3e-3
+  weight_decay: 1e-4
+  batch_size: 512
+  num_workers: 8
+  drop_rate: 0.15
