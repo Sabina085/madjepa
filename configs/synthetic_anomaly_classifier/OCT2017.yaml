@@ -1,0 +1,14 @@
+data:
+    subset: OCT
+    experiment_name: experiments_OCT2017/experiment_1
+model:
+  hidden_size: 128
+  activation: "gelu"
+
+optimization: 
+  num_epochs: 20
+  lr: 1e-4
+  weight_decay: 1e-3
+  batch_size: 64
+  drop_rate: 0.3
+  num_workers: 8
