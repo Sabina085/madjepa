@@ -1,29 +1,14 @@
-meta:
-  use_bfloat16: true
-  load_checkpoint_path: pretrained_checkpoints/init_checkpoints/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3.pth.tar
-  checkpoint_type: dinov3
-  # encoder
-  encoder_model_name: dinov3_vits16
-  encoder_weights_source: pretrained_checkpoints/dinov3_models/dinov3_vits16_pretrain_lvd1689m-08c60483.pth
-  encoder_embed_dim: 384
-  # predictor
-  predictor_model_name: ijepa_predictor_from_IN22K_vitg16_600e
-  predictor_weights_source: pretrained_checkpoints/ijepa_checkpoints/IN22K-vit.g.16-600e.pth.tar
-  predictor_depth: 16
-  predictor_embed_dim: 384
-  predictor_num_heads: 16
-  # target encoder
-  target_encoder_model_name: dinov3_vits16 # should be the same as for the context encoder 
-  target_encoder_weights_source : pretrained_checkpoints/dinov3_models/dinov3_vits16_pretrain_lvd1689m-08c60483.pth # should be the same as for the context encoder
-
 data:
-  # training specifics
   batch_size: 32
-  crop_size: 224
+  count_border_pixels: 2
   crop_scale:
   - 0.8
   - 1.0
-
+  crop_size: 224
+  data_root_folder_path: /media/vhondru/hdd/istoian/BMAD/dataset
+  image_folder: BraTS2021_slice/train/
+  num_workers: 10
+  pin_mem: true
   # image normalization statistics
   # ImageNet statistics
   image_transform_statistics:
@@ -37,56 +22,55 @@ data:
     - 0.224
     - 0.225
 
-  # the border of background pixels left in the input image after ROI cropping
-  count_border_pixels: 2
-  
-  image_folder: BraTS2021_slice/
-  data_root_folder_path: /home/sabina/PhD/BMAD
-  pin_mem: True
-  num_workers: 10
-
-
+logging:
+  logging_folder: experiments_BraTS2021_slice/experiment_1/logs/
+  write_tag: experiment_1
 mask:
-  patch_size: 16
   allow_overlap: false
-
-  # -- encoder context box sampling rules
+  enc_mask_aspect_ratio:
+  - 1.0
+  - 1.0
   enc_mask_scale:
   - 0.85
   - 1.0
-  enc_mask_aspect_ratio:
-  # sampled context has unit aspect ratio - as it was mentioned in the paper
-  - 1.0
-  - 1.0
   enc_min_keep: 10
   num_enc_masks: 1
-
-   ### predictor/target encoder box sampling rules 
-  pred_mask_scale:
-  - 0.15
-  - 0.2
+  num_pred_masks: 4
+  patch_size: 16
   pred_mask_aspect_ratio:
   - 0.75
   - 1.5
-  num_pred_masks: 4
-
-
+  pred_mask_scale:
+  - 0.15
+  - 0.2
+meta:
+  checkpoint_type: dinov3
+  encoder_embed_dim: 384
+  encoder_model_name: dinov3_vits16
+  encoder_weights_source: pretrained_checkpoints/dinov3_checkpoints/dinov3_vits16_pretrain_lvd1689m-08c60483.pth
+  load_checkpoint_path: pretrained_checkpoints/init_checkpoints/enc_vits16_dinov3_pred_vitg16_ijepa_target_vits16_dinov3.pth.tar
+  predictor_depth: 16
+  predictor_embed_dim: 384
+  predictor_model_name: ijepa_predictor_from_IN22K_vitg16_600e
+  predictor_num_heads: 16
+  predictor_weights_source: pretrained_checkpoints/ijepa_checkpoints/IN22K-vit.g.16-600e.pth.tar
+  target_encoder_model_name: dinov3_vits16
+  target_encoder_weights_source: pretrained_checkpoints/dinov3_checkpoints/dinov3_vits16_pretrain_lvd1689m-08c60483.pth
+  use_bfloat16: true
+  layer_norm_teacher: false
 optimization:
-  num_epochs: 40
   ema:
   - 0.996
   - 1.0
-  ipe_scale: 1.0
-
-  lr: 0.001
-  start_lr: 0.0002
   final_lr: 1.0e-06
-  warmup: 3
-
-  weight_decay: 0.04
   final_weight_decay: 0.4
+  ipe_scale: 1.0
+  lr: 0.001
+  num_epochs: 20
+  start_lr: 0.0002
+  warmup: 3
+  weight_decay: 0.04
+  patience: 20
 
-
-logging:
-  logging_folder: experiments_BraTS2021_slice/experiment_early_stopping_40_epochs_2/logs/
-  write_tag: experiment_early_stopping_2
+  encoder_mlp_dropout: 0.0
+  predictor_mlp_dropout: 0.0

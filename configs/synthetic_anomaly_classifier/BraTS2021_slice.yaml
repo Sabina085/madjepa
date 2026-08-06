@@ -1,0 +1,18 @@
+data:
+    subset: BraTS
+    experiment_name: experiments_BraTS2021_slice/experiment_1
+
+model:
+  hidden_size: 128
+  activation: "gelu"
+
+optimization: 
+  num_epochs: 20
+  lr: 1e-3
+  weight_decay: 1e-3
+  batch_size: 64
+  drop_rate: 0.0
+  num_workers: 8
+  scheduler_patience: 3
+  scheduler_factor: 0.5
+  scheduler_min_lr: 1e-5

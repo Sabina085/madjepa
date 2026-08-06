@@ -1,7 +1,6 @@
 data:
     dataset_name: BraTS2021_slice
-    experiment_name: experiment_drop_last_false
-
+    experiment_name: experiment_1
 model:
     hidden_size: 384
     num_hidden_layers: 6
@@ -11,8 +10,12 @@ model:
 optimization:
     num_epochs: 100
     warmup_epochs: 10
-    train_batch_size: 64
+    train_batch_size: 512
     start_lr: 1e-6
     peak_lr: 1e-3
     final_lr: 1e-5
     weight_decay: 0.05
+    patience: 100 # epochs
+    hidden_dropout_prob: 0.0
+    layer_norm: False
+    normalize_before_computing_distance: False
