@@ -61,7 +61,8 @@ class DistilledModelTrainer:
         # Read the configuration file (which was used for training the target encoder)
         self.train_ijepa_config = read_train_ijepa_config(config_path=self.train_ijepa_config_path)
 
-        self.ijepa_ckpt_file_path = f"{self.ijepa_ckpt_folder_path}/{self.train_ijepa_config.tag}-latest.pth.tar"
+        self.ijepa_ckpt_file_path = f"{self.ijepa_ckpt_folder_path}/{self.train_ijepa_config.tag}-epoch-20.pth.tar"
+        # self.ijepa_ckpt_file_path = f"{self.ijepa_ckpt_folder_path}/{self.train_ijepa_config.tag}-latest.pth.tar"
 
         # Create a hash based on the training config of the distilled model
         json_train_distillation_config_sorted = json.dumps(vars(self.train_distillation_config), sort_keys=True)

@@ -55,7 +55,11 @@ class PredictionsDistilledModelGenerator:
         ijepa_ckpt_folder_path = (
             f"{self.experiment_folder_path}/checkpoints"
         )
-        self.ijepa_ckpt_file_path = f"{ijepa_ckpt_folder_path}/{self.inference_anomaly_detection_config.experiment_name}-latest.pth.tar"
+        self.ijepa_ckpt_file_path = os.path.join(
+            ijepa_ckpt_folder_path,
+            f"{self.inference_anomaly_detection_config.experiment_name}-epoch-20.pth.tar",
+            # f"{self.inference_anomaly_detection_config.experiment_name}-latest.pth.tar",
+        )
         print("I-Jepa checkpoint file path: ", self.ijepa_ckpt_file_path)
        
         self.distilled_model_hash_folder = self.distillation_train_config_path.split("/")[-2]

@@ -42,7 +42,8 @@ class PredictionsClassifierModelGenerator:
         ijepa_ckpt_folder_path = os.path.join(self.experiment_folder_path, "checkpoints")
         self.ijepa_ckpt_file_path = os.path.join(
             ijepa_ckpt_folder_path,
-            f"{self.inference_anomaly_detection_config.experiment_name}-latest.pth.tar",
+            f"{self.inference_anomaly_detection_config.experiment_name}-epoch-20.pth.tar",
+            # f"{self.inference_anomaly_detection_config.experiment_name}-latest.pth.tar",
         )
 
         self.classifier_hash_folder = Path(train_classification_model_config_path).parent.name

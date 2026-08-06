@@ -32,7 +32,6 @@ def main(*args, **kwargs):
     weight_classification_test = float(args.weight_classification_test)
     inference_configs = sorted(glob.glob(args.inference_config_pattern_path))
     print("Number of inference configs: ", len(inference_configs))
-    # time.sleep(1800)
 
     for inference_config_path in inference_configs:
         print("Inference config: ", inference_config_path)

@@ -207,7 +207,8 @@ def train(args):
     )
     target_encoder.forward = target_encoder_forward_dinov3.__get__(target_encoder)
 
-    checkpoint_path = glob.glob(os.path.join(experiment_folder_path, "checkpoints/*-latest.pth.tar"))[0]
+    checkpoint_path = glob.glob(os.path.join(experiment_folder_path, "checkpoints/*-epoch-20.pth.tar"))[0]
+    # checkpoint_path = glob.glob(os.path.join(experiment_folder_path, "checkpoints/*-latest.pth.tar"))[0]
     checkpoint = torch.load(checkpoint_path, map_location="cpu")
     state_dict = convert_from_ddp_to_normal_state_dict(checkpoint["target_encoder"])
     target_encoder.load_state_dict(state_dict)
