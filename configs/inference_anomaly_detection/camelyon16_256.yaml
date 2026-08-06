@@ -14,6 +14,7 @@ inference:
   gaussian_filter_blur_sigma_distillation: 4
   # For computing the image-level metrics
   image_statistic_for_classification: "mean"
+  global_seed_random_boxes: 0
 
 misc:
   # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
