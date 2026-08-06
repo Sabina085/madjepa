@@ -60,7 +60,8 @@ class PredictionsRandomBoxesGenerator:
         )
         self.ckpt_file_path = (
             f"{self.ckpt_folder_path}/"
-            f"{self.inference_config.experiment_name}-latest.pth.tar"
+            f"{self.inference_config.experiment_name}-epoch-20.pth.tar"
+            # f"{self.inference_config.experiment_name}-latest.pth.tar"
         )
 
         self.random_boxes_path = f"{self.experiment_folder_path}/random_boxes_images"
