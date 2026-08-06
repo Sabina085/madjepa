@@ -1,0 +1,14 @@
+data:
+    subset: RESC
+    experiment_name: experiments_RESC/experiment_1
+model:
+  hidden_size: 128
+  activation: "gelu"
+
+optimization: 
+  num_epochs: 20
+  lr: 5e-4
+  weight_decay: 1e-1
+  batch_size: 64
+  num_workers: 8
+  drop_rate: 0.5
