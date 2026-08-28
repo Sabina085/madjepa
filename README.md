@@ -12,7 +12,7 @@ Official implementation of the MADJEPA (Multi-Stage Joint-Embedding Predictive A
 
 MADJEPA predicts both image-level and pixel-level anomaly scores based on discrepancies in latent representations.
 
-We conduct comprehensive experiments on six datasets covering various medical image domains (e.g.~MRI, OCT, X-ray, histopathology), which form the recently proposed [BMAD benchmark](https://arxiv.org/abs/2306.11876). Our method (MADJEPA), attains competitive results, ranking first or second on most datasets.
+We conduct comprehensive experiments on six datasets covering various medical image domains (e.g.~MRI, OCT, X-ray, histopathology), which form the recently proposed [BMAD benchmark](https://arxiv.org/abs/2306.11876). Our method, MADJEPA, attains competitive results, ranking first or second on most datasets.
 
 <img src="./figures/ijepa-pipeline.png" alt="drawing" width="700"/>
 
@@ -45,7 +45,7 @@ This command will <b>sequentially run the three training stages</b>:
 
 #### &nbsp;&nbsp;&nbsp;&nbsp;Notes
 
- &nbsp;&nbsp;&nbsp;&nbsp;The configs for target encoder distillation and the pseudo-anomaly classifier could be found in the folders <code> configs/train_distillation </code> and <code>configs//tsynthetic_anomaly_classifier</code> respectively.
+ &nbsp;&nbsp;&nbsp;&nbsp;The configs for target encoder distillation and the pseudo-anomaly classifier could be found in the folders <code> configs/train_distillation </code> and <code>configs/synthetic_anomaly_classifier</code> respectively.
 
  &nbsp;&nbsp;&nbsp;&nbsp; The command will automatically read the configuration files having the same name as <code>train_ijepa_config_pattern_path</code> for phase 2 and phase 3 from the aforementioned folders.
 
