@@ -14,7 +14,7 @@ MADJEPA predicts both image-level and pixel-level anomaly scores based on discre
 
 We conduct comprehensive experiments on six datasets covering various medical image domains (e.g.~MRI, OCT, X-ray, histopathology), which form the recently proposed [BMAD benchmark](https://arxiv.org/abs/2306.11876). Our method (MADJEPA), attains competitive results, ranking first or second on most datasets.
 
-<img src="./figures/ijepa-pipeline.png" alt="drawing" width="500"/>
+<img src="./figures/ijepa-pipeline.png" alt="drawing" width="700"/>
 
 
 ## MADJEPA training pipeline
