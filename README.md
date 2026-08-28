@@ -4,19 +4,7 @@ Official implementation of the MADJEPA framework.
 
 ## Method
 
-
 <img src="./figures/ijepa-pipeline.png" alt="drawing" width="500"/>
-
-
-<!-- ![image](./figures/ijepa-pipeline.png) -->
-
-
-IJEPA paper link
-https://arxiv.org/pdf/2301.08243
-
-
-BMAD benchmark link
-https://arxiv.org/abs/2306.11876
 
 
 ## Setup
@@ -31,11 +19,11 @@ python3 training_pipeline.py \
 ```
 
 ### Examples
-* <b> Brats2021 (Brain MRI)</b> dataset : <code> python3 training_pipeline.py --train_ijepa_config_pattern_path="configs/train_ijepa/BraTS2021_slice.yaml"</code>
+* <i> Brats2021 (Brain MRI)</i> dataset : <code> python3 training_pipeline.py --train_ijepa_config_pattern_path="configs/train_ijepa/BraTS2021_slice.yaml"</code>
 
-* <b> hist_DIY (Liver CT) </b> dataset : <code> python3 training_pipeline.py --train_ijepa_config_pattern_path="configs/train_ijepa/hist_DIY.yaml"</code>
+* <i> hist_DIY (Liver CT) </i> dataset : <code> python3 training_pipeline.py --train_ijepa_config_pattern_path="configs/train_ijepa/hist_DIY.yaml"</code>
 
-* <b> RSNA (Chest X-ray) </b> dataset : <code> python3 training_pipeline.py --train_ijepa_config_pattern_path="configs/train_ijepa/ChestRSNA.yaml"</code>
+* <i> RSNA (Chest X-ray) </i> dataset : <code> python3 training_pipeline.py --train_ijepa_config_pattern_path="configs/train_ijepa/ChestRSNA.yaml"</code>
 
 This command will <b>sequentially run the three training stages</b>:
 1. <b>I-JEPA training</b> (stage 1)
@@ -54,7 +42,7 @@ This command will <b>sequentially run the three training stages</b>:
  &nbsp;&nbsp;&nbsp;&nbsp; The command will automatically read the configuration files having the same name as <code>train_ijepa_config_pattern_path</code> for phase 2 and phase 3 from the aforementioned folders.
 
 
-# Anomaly detection pipeline
+## Anomaly detection pipeline
 For running complete anomaly detection pipeline with MADJEPA, use the following command:
 
 ```bash
@@ -73,6 +61,25 @@ python3 anomaly_detection_pipeline.py \
 --weight_classification_test=0.1 
 ```
 
-## Acknowledgements
-This work is built on the code and concepts from the [I-JEPA codebase](https://github.com/facebookresearch/ijepa). 
+This command will <b>sequentially run the following steps</b>:
+* Inference - stage 1 (I-JEPA training)
+* Inference - stage 2 (target encoder distillation)
+* Inference - stage 3 (pseudo-anomaly classifier)
+* Build anomaly maps - I-JEPA 
+* Build anomaly maps - distilled student
+* Compute anomaly detection metrics
 
+
+### CLI arguments
+
+<code>inference_config_pattern_path</code> = path to the inference yaml config file. The configuration files that we used for each dataset could be found in the <code>configs/inference_anomaly_detection</code> folder.
+
+<code>weight_distillation_test</code> = float number in [0, 1] range - the weight of the distilled student score in the final aggregated anomaly score
+
+<code>weight_classification_test</code> = float number in [0, 1] range - the weight of the pseudo-anomaly classifier score in the final aggregated anomaly score
+
+
+## Acknowledgements
+This work is built on the code and concepts from the [I-JEPA codebase](https://github.com/facebookresearch/ijepa), [I-JEPA paper](https://arxiv.org/pdf/2301.08243).
+
+MADJEPA was trained and evaluated on [BMAD benchmark](https://arxiv.org/abs/2306.11876).
