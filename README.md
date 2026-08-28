@@ -1,13 +1,21 @@
 # MADJEPA - Enhanced Multi-Stage Joint-Embedding Predictive Architecture for Medical Anomaly Detection
 
-Official implementation of the MADJEPA framework.
+Official implementation of the MADJEPA (Multi-Stage Joint-Embedding Predictive Architecture for Medical Anomaly Detection) paper.
 
 ## Method
 
+**MADJEPA (Multi-Stage Joint-Embedding Predictive Architecture for Medical Anomaly Detection)** is a multi-stage training framework for unsupervised anomaly detection. Specifically, our pipeline is divided into three training stages:
+
+* Stage 1. **Self-supervised training via [I-JEPA](https://arxiv.org/pdf/2301.08243)**
+* Stage 2. **Target encoder distillation to a randomly-initialized student**
+* Stage 3. **A: prompt-based pseudo-anomaly generation** and **B: normal vs. pseudo-anomaly classification**
+
+MADJEPA predicts both image-level and pixel-level anomaly scores based on discrepancies in latent representations.
+
+We conduct comprehensive experiments on six datasets covering various medical image domains (e.g.~MRI, OCT, X-ray, histopathology), which form the recently proposed [BMAD benchmark](https://arxiv.org/abs/2306.11876). Our method (MADJEPA), attains competitive results, ranking first or second on most datasets.
+
 <img src="./figures/ijepa-pipeline.png" alt="drawing" width="500"/>
 
-
-## Setup
 
 ## MADJEPA training pipeline
 
