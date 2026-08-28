@@ -183,7 +183,7 @@ class PredictionsRandomBoxesGenerator:
             dict_mask_target_encoder, 
             encoder_mask
         ):
-        ### Optional function used for saving the sampled input boxes and the original images (not essential, can be removed)
+        # Optional function used for saving the sampled input boxes and the original images (not essential, can be removed)
         encoder_context_mask_arr = transform_from_mask_to_box(
                         image_height=self.train_config.crop_size,
                         image_width=self.train_config.crop_size,
@@ -342,10 +342,9 @@ class PredictionsRandomBoxesGenerator:
             list_seeds = []
             list_cropped_borders_dicts = []
 
-            # -- used for building the anomaly map
+            # used for building the anomaly maps
             num_patches = (self.train_config.crop_size // self.train_config.patch_size) * (self.train_config.crop_size // self.train_config.patch_size)
             image_per_patch_distances = {}
-            # --
             
             encoder.eval()
             target_encoder.eval()
@@ -381,7 +380,7 @@ class PredictionsRandomBoxesGenerator:
                         seed=seed
                     )
                     with torch.no_grad():      
-                        # --- Target encoder forward prop
+                        # Target encoder forward prop
                         # Forward propagation on the original input image (unmasked, as it was mentioned in the paper)
                         target_encoder_emb = target_encoder(image)
                         if self.train_config.layer_norm_teacher:
@@ -393,13 +392,13 @@ class PredictionsRandomBoxesGenerator:
                         target_encoder_emb = apply_masks(target_encoder_emb, list_masks_target_encoder)
                         target_encoder_emb = repeat_interleave_batch(target_encoder_emb, B, repeat=1)
 
-                        # --- (Context) Encoder forward prop
+                        # Context encoder forward prop
                         encoder_emb = encoder(image, encoder_mask)
 
-                        # --- Predictor forward prop
+                        # Predictor forward prop
                         predictor_emb = predictor(encoder_emb, encoder_mask, list_masks_target_encoder)
 
-                        # --- Compute the metrics
+                        # Compute the metrics
                         # Average distance between the predicted and target patch-level representations (embeddings) for the random box
                         # Get distances per patch embedding for building an anomaly map
                         if self.inference_config.distance == "l2":

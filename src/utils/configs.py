@@ -6,24 +6,24 @@ class TrainIjepaConfig():
     load_checkpoint_path: str
     checkpoint_type: str
 
-    # -- context encoder
+    # context encoder
     encoder_model_name: str
     encoder_weights_source: str
     encoder_embed_dim: int
 
-    # --- predictor
+    # predictor
     predictor_model_name: str
     predictor_weights_source: str
     predictor_depth: int
     predictor_num_heads: int
     predictor_embed_dim: int
 
-    # --- target encoder
+    # target encoder
     target_encoder_model_name: str
     target_encoder_weights_source: str
     layer_norm_teacher: bool
 
-    # --- data
+    # data
     batch_size: int
     crop_size: int
     patch_size: int
@@ -35,23 +35,23 @@ class TrainIjepaConfig():
     pin_mem: bool
     num_workers: int
 
-    # --- image transforms
+    # image transforms
     transform_mean: Tuple[float, float, float]
     transform_std: Tuple[float, float, float]
 
-    # -- target blocks / masks
+    # target blocks / masks
     target_block_scale: Tuple[float, float]
     target_block_aspect_ratio: Tuple[float, float]
     num_pred_masks: int
     allow_overlap: bool
 
-    # --- context block / mask
+    # context block / mask
     enc_mask_scale: Tuple[float, float]
     enc_mask_aspect_ratio: Tuple[float, float]
     enc_min_keep: int
     num_enc_masks: int
 
-    # --- optimization
+    # optimization
     num_epochs: int
     patience: int
     ema: Tuple[float, float]
@@ -65,7 +65,7 @@ class TrainIjepaConfig():
     encoder_mlp_dropout: float
     predictor_mlp_dropout: float
     
-    # --- logging 
+    # logging 
     logging_folder: str
     tag: str
 
@@ -80,24 +80,24 @@ def read_train_ijepa_config(config_path: str) -> TrainIjepaConfig:
 
     assert config.checkpoint_type in ["dinov3", "ijepa"], "Checkpoint type should be: 'dinov3' or 'ijepa'"
 
-    # --- context encoder
+    # context encoder
     config.encoder_model_name = config_dict["meta"]["encoder_model_name"]
     config.encoder_weights_source = config_dict["meta"]["encoder_weights_source"]
     config.encoder_embed_dim = config_dict["meta"]["encoder_embed_dim"]
 
-    # --- target encoder
+    # target encoder
     config.target_encoder_model_name = config_dict["meta"]["target_encoder_model_name"]
     config.target_encoder_weights_source = config_dict["meta"]["target_encoder_weights_source"]
     config.layer_norm_teacher = config_dict["meta"]["layer_norm_teacher"]
 
-    # --- predictor
+    # predictor
     config.predictor_model_name = config_dict["meta"]["predictor_model_name"]
     config.predictor_weights_source = config_dict["meta"]["predictor_weights_source"]
     config.predictor_depth = config_dict["meta"]["predictor_depth"]
     config.predictor_num_heads = config_dict["meta"]["predictor_num_heads"]
     config.predictor_embed_dim = config_dict["meta"]["predictor_embed_dim"]
 
-    # --- data
+    # data
     config.batch_size = config_dict["data"]["batch_size"]
     config.crop_size = config_dict["data"]["crop_size"]
     config.patch_size = config_dict["mask"]["patch_size"]
@@ -109,7 +109,7 @@ def read_train_ijepa_config(config_path: str) -> TrainIjepaConfig:
     config.pin_mem = config_dict["data"]["pin_mem"]
     config.num_workers = config_dict["data"]["num_workers"]
     
-    # ---image transforms
+    # image transforms
     config.transform_mean = (
         config_dict["data"]["image_transform_statistics"]["mean"][0],
         config_dict["data"]["image_transform_statistics"]["mean"][1],
@@ -121,19 +121,19 @@ def read_train_ijepa_config(config_path: str) -> TrainIjepaConfig:
     config_dict["data"]["image_transform_statistics"]["std"][2]
     )
 
-    # -- target blocks / masks
+    # target blocks / masks
     config.target_block_scale = config_dict["mask"]["pred_mask_scale"] # scale of target blocks
     config.target_block_aspect_ratio = config_dict["mask"]["pred_mask_aspect_ratio"] # aspect ratio of target blocks
     config.num_pred_masks = config_dict["mask"]["num_pred_masks"]  # number of target blocks
     config.allow_overlap = config_dict["mask"]["allow_overlap"]  # whether to allow overlap b/w context and target blocks
     
-    # --- context block / mask
+    # context block / mask
     config.enc_mask_scale = config_dict["mask"]["enc_mask_scale"] # scale of context blocks
     config.enc_mask_aspect_ratio = config_dict["mask"]["enc_mask_aspect_ratio"] # aspect ratio of the context blocks
     config.enc_min_keep = config_dict["mask"]["enc_min_keep"] # min number of patches in context block
     config.num_enc_masks = config_dict["mask"]["num_enc_masks"] # number of context blocks
 
-    # --- optimization
+    # optimization
     config.num_epochs = config_dict["optimization"]["num_epochs"]
     config.patience = config_dict["optimization"]["patience"]
     config.ema = config_dict["optimization"]["ema"]
@@ -155,12 +155,12 @@ def read_train_ijepa_config(config_path: str) -> TrainIjepaConfig:
 
 
 class InferenceAnomalyDetectionConfig():
-   # --- data
+   # data
    dataset_name: str
    experiment_name: str
    split: str
 
-   # --- inference 
+   # inference 
    num_sampled_random_boxes_per_image: int
    distance: str
    aggregate_patches_strategy: str
@@ -169,7 +169,7 @@ class InferenceAnomalyDetectionConfig():
    image_statistic_for_classification: str
    global_seed_random_boxes: int
 
-   # --- misc
+   # misc
    save_images_with_masks: bool
 
 
@@ -178,12 +178,12 @@ def read_inference_anomaly_detection_config(config_path: str) -> InferenceAnomal
         yaml_dict = yaml.safe_load(f)
 
     config = InferenceAnomalyDetectionConfig()
-    # --- data
+    # data
     config.dataset_name = yaml_dict["data"]["dataset_name"]
     config.experiment_name = yaml_dict["data"]["experiment_name"]
     config.split = yaml_dict["data"]["split"]
 
-    # --- inference
+    # inference
     # How many random target boxes to sample per image
     config.num_sampled_random_boxes_per_image = yaml_dict["inference"]["num_sampled_random_boxes_per_image"]
     config.distance = yaml_dict["inference"]["distance"]
@@ -194,25 +194,25 @@ def read_inference_anomaly_detection_config(config_path: str) -> InferenceAnomal
     config.image_statistic_for_classification = yaml_dict["inference"]["image_statistic_for_classification"]
     config.global_seed_random_boxes = yaml_dict["inference"].get("global_seed_random_boxes", 0)
 
-    # --- misc
-    # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
+    # misc
+    # If you want to save the masked images (non essential - useful for debugging and for understanding how the box sampling is performed)
     config.save_images_with_masks = yaml_dict["misc"]["save_images_with_masks"]
 
     return config
 
 
 class TrainDistillationConfig:
-    # --- data
+    # data
     dataset_name: str
     experiment_name: str
 
-    # --- model
+    # model
     hidden_size: int
     num_hidden_layers: int
     num_attention_heads: int
     intermediate_size: int
 
-    # --- optimization
+    # optimization
     num_epochs: int
     warmup_epochs: int
     train_batch_size: int

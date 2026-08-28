@@ -15,7 +15,6 @@ def get_image_background_borders(image_arr: np.ndarray, count_border_pixels=2) -
     coords = np.argwhere(mask)
 
     if len(coords) == 0:
-        # image is fully background
         return {
             "left": 0,
             "top": 0,
@@ -26,7 +25,7 @@ def get_image_background_borders(image_arr: np.ndarray, count_border_pixels=2) -
     min_row, min_col = coords.min(axis=0)
     max_row, max_col = coords.max(axis=0)
 
-    # Add padding safely
+    # Add count_border_pixels padding
     min_row = max(min_row - count_border_pixels, 0)
     max_row = min(max_row + count_border_pixels, num_rows - 1)
 
@@ -56,7 +55,7 @@ def convert_background_to_white(
         # Liver dataset - where the background is fully black
         _, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY)
     elif dataset.lower() == "resc":
-        # Otsu's Thresholding to separate the main object from the black background
+        # Otsu's thresholding - to separate the main object from the black background
         # RESC dataset
         _, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
@@ -69,7 +68,7 @@ def convert_background_to_white(
         return image_original.copy()
 
     if dataset.lower() == "hist_diy":
-        # There are samples where we have separate components, so we take all th identified foreground contours
+        # There are samples where we have separate components, so we take all the identified foreground contours
         filled_mask = np.zeros_like(mask)
         cv2.drawContours(filled_mask, contours, -1, 255, thickness=cv2.FILLED)
     else:
@@ -91,8 +90,7 @@ def get_binary_threshold_map(image_original: np.ndarray, denoise_before=False):
     else:
         gray = image_original.copy()
 
-    # Otsu's Thresholding
-    # This automatically finds the best threshold value to separate background from foreground
+    # Otsu's thresholding - finds the best threshold value to separate background from foreground
     if denoise_before:
         blurred = cv2.GaussianBlur(gray, (5,5), 0)
         # blurred = cv2.medianBlur(gray, 5)
@@ -106,7 +104,7 @@ def get_binary_threshold_map(image_original: np.ndarray, denoise_before=False):
         cv2.THRESH_BINARY + cv2.THRESH_OTSU
     )
 
-    # Removes small "salt and pepper" noise from the thresholded mask
+    # Removes small salt and pepper noise from the thresholded mask
     kernel = np.ones((3,3), np.uint8)
     image_otsu = cv2.morphologyEx(image_otsu, cv2.MORPH_OPEN, kernel)
     binary_threshold_map = cv2.medianBlur(image_otsu, 5)

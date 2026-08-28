@@ -17,5 +17,5 @@ inference:
   global_seed_random_boxes: 0
 
 misc:
-  # If you want to save the masked images using the (non essential - useful for debugging and for understanding how the box sampling is performed)
+  # If you want to save the masked images (non essential - useful for debugging and for understanding how the box sampling is performed)
   save_images_with_masks: False

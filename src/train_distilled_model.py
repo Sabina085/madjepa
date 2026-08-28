@@ -144,7 +144,6 @@ class DistilledModelTrainer:
 
     def _init_student_model(self):
         # Initializing a ViT model with a custom configuration
-        # 6 transformer blocks, 6 attention heads, 384 hidden size, mlp_ratio=4 
         configuration = ViTConfig(
             hidden_size=self.train_distillation_config.hidden_size,
             num_hidden_layers=self.train_distillation_config.num_hidden_layers,
@@ -157,7 +156,7 @@ class DistilledModelTrainer:
         self.student_model = ViTModel(configuration).to(self.device)
     
     def _init_target_encoder(self):
-        # Init DinoV3/I-Jepa models: (context) encoder (DinoV3) + predictor (I-Jepa checkpoint) + target_encoder (DinoV3 - same architecture as the context encoder)
+        # Init DINOv3/I-Jepa models: context encoder (DINOv3) + predictor (I-Jepa checkpoint) + target_encoder (DINOv3 - same architecture as the context encoder)
         dict_models = init_model_dinov3(
             device=self.device,
             encoder_model_name=self.train_ijepa_config.encoder_model_name,
@@ -171,7 +170,7 @@ class DistilledModelTrainer:
             target_encoder_weights_path=self.train_ijepa_config.target_encoder_weights_source
         )
 
-        # Load the pre-trained checkpoint (encoder + target encoder - DinoV3 VitS, predictor - IJepa checkpoint)
+        # Load the pre-trained checkpoint (encoder + target encoder - DINOv3 VitS, predictor - custom ViT from IJepa checkpoint)
         print(f"Loading ijepa checkpoint from: {self.ijepa_ckpt_file_path}")
         loaded_dict_from_checkpoint = load_models_from_checkpoint(
             checkpoint_path=self.ijepa_ckpt_file_path,
@@ -236,14 +235,14 @@ class DistilledModelTrainer:
         # self.valid_criterion = torch.nn.SmoothL1Loss(reduction="none")
 
         # Learning rate schedulers
-        # Phase 1: Linear Warmup -> from START_LR up to PEAK_LR
+        # linear warmup: from start_lr to peak_lr
         self.warmup_sched = LinearLR(
             self.optimizer, 
             start_factor=self.train_distillation_config.start_lr / self.train_distillation_config.peak_lr, 
             total_iters=self.train_distillation_config.warmup_epochs
         )
 
-        # Phase 2: Cosine Annealing -> from 1e-3 (PEAK_LR) down to 1e-5 (FINAL_LR)
+        # cosine annealing: from peak_lr down to final_lr
         self.cosine_sched = CosineAnnealingLR(
             self.optimizer, 
             T_max=self.train_distillation_config.num_epochs - self.train_distillation_config.warmup_epochs, 
@@ -287,12 +286,10 @@ class DistilledModelTrainer:
         global_max = torch.max(weights).detach().cpu()
         global_min = torch.min(weights).detach().cpu()
 
-        # Let's look at the first 16 filters (out of 384)
+        # display the first 16 filters (out of 384)
         fig, axes = plt.subplots(4, 4, figsize=(8, 8))
         for i, ax in enumerate(axes.flat):
-            # Permute from [C, H, W] to [H, W, C] for plotting
             filter_img = weights[i].detach().cpu().permute(1, 2, 0)
-            # Normalize weights to [0, 1] for visualization
             normalized_filter = (filter_img - global_min) / (global_max - global_min + 1e-8)
             ax.imshow(normalized_filter)
             ax.axis('off')
@@ -349,7 +346,7 @@ class DistilledModelTrainer:
 
                 image = image.to(self.device)
                 with torch.no_grad():
-                    # --- Target encoder forward prop
+                    # Target encoder forward prop
                     target_encoder_emb = self.target_encoder(image)
                     if self.train_distillation_config.layer_norm:
                         target_encoder_emb = F.layer_norm(target_encoder_emb, (target_encoder_emb.size(-1),))  # normalize over feature-dim
@@ -407,7 +404,7 @@ class DistilledModelTrainer:
                     valid_image = valid_image.to(self.device)
 
                     with torch.no_grad():
-                        # --- Target encoder forward prop
+                        # Target encoder forward prop
                         valid_target_encoder_emb = self.target_encoder(valid_image)
                         if self.train_distillation_config.layer_norm:
                             valid_target_encoder_emb = F.layer_norm(valid_target_encoder_emb, (valid_target_encoder_emb.size(-1),))  # normalize over feature-dim

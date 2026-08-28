@@ -79,7 +79,7 @@ def compute_roc_auc_metrics(
     print("Number of anomalous samples: ", sum(gt_label_list))
     print("Total number of samples: ", len(gt_label_list))
 
-    # Calculate image-level ROC AUC score
+    # Calculate image-level ROCAUC score
     image_roc_auc = roc_auc_score(y_true=gt_label_list, y_score=image_scores)
 
     display = RocCurveDisplay.from_predictions(y_true=gt_label_list, y_score=image_scores)

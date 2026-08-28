@@ -1,11 +1,12 @@
 """
-Linear classifier on BMAD synthetic anomaly dataset using a frozen I-JEPA target encoder.
+Pseudo-anomaly classifier on BMAD synthetic anomaly dataset using a frozen I-JEPA target encoder.
 
-The train split provides (normal, synthetic_anomaly, anomaly_map) triplets from:
-  - acroitoru/bbmad_restructured —> normal images
-  - acroitoru/medical_anomalies_qwen —> paired synthetic anomalies
+- acroitoru/bbmad_restructured —> normal images
+- acroitoru/medical_anomalies_qwen —> paired synthetic anomalies
 
-Each triplet yields two labelled samples: normal (label=0) and synthetic anomaly (label=1).
+- normal sample: label = 0
+- synthetic anomaly: label = 1
+
 The val/test splits have real labels from the BMAD benchmark.
 """
 
@@ -49,14 +50,6 @@ class _BMADBase:
 
 
 class TrainClassificationDataset(_BMADBase, Dataset):
-    """
-    Flat (image, label) dataset built from BMAD train triplets.
-
-    Each underlying triplet (normal, synthetic_anomaly, anomaly_map) produces two
-    samples — the normal image (label 0) followed by the synthetic anomaly (label 1) —
-    so __len__ returns 2 * len(triplets).
-    """
-
     def __init__(self, subset: str, transform):
         self.transform = transform
         self.normal_ds, indices = self._load_and_filter("train", subset)
@@ -122,7 +115,7 @@ class HeadClassifier(nn.Module):
 
 @torch.no_grad()
 def extract_features(encoder, images: torch.Tensor, layer_norm_teacher) -> torch.Tensor:
-    # Run frozen target encoder and mean-pool patch tokens → [B, D]
+    # Run frozen target encoder and mean-pool patch tokens
     patch_tokens = encoder(images)   # [B, N, D]
 
     if layer_norm_teacher:
@@ -181,7 +174,6 @@ def train(args):
     ]
     image_transform = transforms.Compose(transforms_list)
 
-    # -- datasets & loaders
     logger.info(f"Loading datasets for subset: {classifer_config.subset}")
     train_ds = TrainClassificationDataset(subset=classifer_config.subset, transform=image_transform)
     val_ds = EvalClassificationDataset(split="val", subset=classifer_config.subset, transform=image_transform)

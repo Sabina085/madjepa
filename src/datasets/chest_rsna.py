@@ -1,9 +1,4 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-#
+# Code adapted from: https://github.com/facebookresearch/ijepa
 
 import os
 import glob
@@ -82,8 +77,8 @@ class ChestRSNA(torchvision.datasets.ImageFolder):
         """
         Chest-RSNA dataset
 
-        :param root: root network directory for Chest-RSNA data
-        :param image_folder: path to images inside root network directory
+        :param root: root directory for Chest-RSNA data
+        :param image_folder: path to images inside root directory
         """
 
         data_path = os.path.join(root, image_folder)

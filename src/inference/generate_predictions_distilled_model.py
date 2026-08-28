@@ -212,7 +212,7 @@ class PredictionsDistilledModelGenerator:
                         target_encoder_emb = F.normalize(target_encoder_emb, dim=-1)
                         student_emb = F.normalize(student_emb, dim=-1)
 
-                    # --- Compute the metrics
+                    # Compute the metrics
                     # Average distance between the predicted and target patch-level representations (embeddings) for the random box
                     if self.inference_anomaly_detection_config.distance == "l2":
                         distance_per_patch = torch.linalg.vector_norm(student_emb - target_encoder_emb, ord=2, dim=2)

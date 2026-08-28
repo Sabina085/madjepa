@@ -25,7 +25,7 @@ CONFIG_CKPT = {
 }
 
 if __name__ == "__main__":
-    # Use the DinoV3 checkpoint for the encoder
+    # Use the DINOv3 checkpoint for the encoder
     encoder = torch.hub.load(
         repo_or_dir=CONFIG_CKPT["github_repo"],
         model=CONFIG_CKPT["encoder_model_name"],
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     msg = predictor.load_state_dict(filtered_predictor_dict, strict=False)
     logger.info(f'Correctly loaded the pretrained predictor from IJepa checkpoint.')
 
-    # Use the DinoV3 checkpoint for the target_encoder
+    # Use the DINOv3 checkpoint for the target_encoder
     target_encoder = torch.hub.load(
         repo_or_dir=CONFIG_CKPT["github_repo"],
         model=CONFIG_CKPT["target_encoder_model_name"],

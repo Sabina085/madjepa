@@ -1,9 +1,4 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-#
+# Code adapted from: https://github.com/facebookresearch/ijepa
 
 import os
 
@@ -171,8 +166,7 @@ def main(*args, **kwargs):
         min_keep=config.enc_min_keep)
 
     # Separate collator instance for validation so that validation batches don't
-    # advance the training collator's shared step counter (which seeds mask block-size
-    # sampling)
+    # advance the training collator's shared step counter (which seeds mask block-size sampling)
     valid_mask_collator = MBMaskCollator(
         input_size=config.crop_size,
         patch_size=config.patch_size,
@@ -313,7 +307,7 @@ def main(*args, **kwargs):
                 is_train=False,
         )
     elif 'Chest-RSNA' in config.image_folder:
-        # OCT2017 dataset
+        # RSNA dataset
         _, train_unsupervised_loader, train_unsupervised_sampler = make_chest_rsna(
                 transform=transform,
                 batch_size=config.batch_size,
@@ -342,6 +336,7 @@ def main(*args, **kwargs):
                 is_train=False,
         )
     elif 'camelyon16_256' in config.image_folder:
+        # CAMELYON dataset
         _, train_unsupervised_loader, train_unsupervised_sampler = make_camelyon(
                 transform=transform,
                 batch_size=config.batch_size,
@@ -604,8 +599,8 @@ def main(*args, **kwargs):
                 
                 valid_losses.append(valid_loss)
 
-        # -- Save the checkpoint if the validation loss (on normal samples) is lower than for the previous checkpoint
-        # -- Early stopping if the validation loss (on normal samples) did not decrease in the last {patience} epochs
+        # Save the checkpoint if the validation loss (on normal samples) is lower than for the previous checkpoint
+        # Early stopping if the validation loss (on normal samples) did not decrease in the last {patience} epochs
         avg_valid_loss_epoch = np.mean(valid_losses)
         logger.info(f"avg. validation loss {avg_valid_loss_epoch}, epoch {epoch + 1}")
         if avg_valid_loss_epoch < best_valid_loss:

@@ -1,9 +1,4 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-#
+# Code adapted from: https://github.com/facebookresearch/ijepa
 
 import logging
 import sys
@@ -72,7 +67,7 @@ def load_models_from_checkpoint(
     checkpoint = torch.load(f=checkpoint_path, map_location=torch.device('cpu'))
     epoch = checkpoint['epoch']
 
-    # -- loading encoder
+    # loading encoder
     encoder_pretrained_dict = checkpoint['encoder']
     encoder_pretrained_dict_not_ddp = convert_from_ddp_to_normal_state_dict(encoder_pretrained_dict)
     msg = encoder.load_state_dict(encoder_pretrained_dict_not_ddp, strict=True)
@@ -82,28 +77,28 @@ def load_models_from_checkpoint(
         encoder.forward = encoder_forward_dinov3.__get__(encoder)
     logger.info(f'Correctly loaded pretrained encoder from epoch {epoch} with msg: {msg}')
 
-    # -- loading predictor
+    # loading predictor
     predictor_pretrained_dict = checkpoint['predictor']
     predictor_pretrained_dict_not_ddp = convert_from_ddp_to_normal_state_dict(predictor_pretrained_dict)
     msg = predictor.load_state_dict(predictor_pretrained_dict_not_ddp, strict=True)
     logger.info(f'Correctly loaded pretrained predictor from epoch {epoch} with msg: {msg}')
 
-    # -- loading target_encoder
+    # loading target_encoder
     target_encoder_pretrained_dict = checkpoint['target_encoder']
     target_encoder_pretrained_dict_not_ddp = convert_from_ddp_to_normal_state_dict(target_encoder_pretrained_dict)
     msg = target_encoder.load_state_dict(target_encoder_pretrained_dict_not_ddp, strict=True)
     if dinov3_ckpt:
         # Override the forward function of the target encoder model with a custom forward function
-        # Necessary when loading a pre-trained DinoV3 model to be used as the target encoder
+        # Necessary when loading a pre-trained DINOv3 model to be used as the target encoder
         target_encoder.forward = target_encoder_forward_dinov3.__get__(target_encoder)
     logger.info(f'Correctly loaded pretrained target encoder from epoch {epoch} with msg: {msg}')
 
-    # -- loading the optimizer if it exists and it is not null
+    # loading the optimizer if it exists and it is not null
     if (optimizer and ('opt' in checkpoint) and checkpoint['opt']):
         optimizer.load_state_dict(checkpoint['opt'])
         logger.info(f'Loaded optimizer from epoch {epoch}')
 
-    # -- loading the scaler if it exists and it is not null
+    # loading the scaler if it exists and it is not null
     if (scaler and ('scaler' in checkpoint) and checkpoint['scaler']):
         scaler.load_state_dict(checkpoint['scaler'])
         logger.info(f'Loaded scaler from the checkpoint. Epoch {epoch}')
@@ -146,8 +141,8 @@ def init_model_dinov3(
 
     dinov3_github_location = "facebookresearch/dinov3"
 
-    # -- Initializing encoder
-    # Dinov3 model
+    # Initializing encoder
+    # DINOv3 model
     encoder = torch.hub.load(
         repo_or_dir=dinov3_github_location,
         model=encoder_model_name,
@@ -159,7 +154,7 @@ def init_model_dinov3(
     set_dropout(model=encoder, drop_rate=encoder_mlp_dropout)
     logger.info(f'Correctly initialized pretrained encoder (DinoV3 checkpoint)!')
 
-    # -- Initializing predictor
+    # Initializing predictor
     # Will be used for loading a pre-trained IJepa predictor 
     predictor = vit.__dict__['vit_predictor'](
         num_patches=predictor_num_patches,
@@ -174,8 +169,8 @@ def init_model_dinov3(
     predictor.to(device=device)
     logger.info(f'Correctly initialized pretrained predictor (to load the weights from an IJepa checkpoint)!')
 
-    # -- Initializing target encoder
-    # Dinov3 model - the same architecture and the same checkpoint used as the encoder model
+    # Initializing target encoder
+    # DINOv3 model - the same architecture and the same checkpoint used as the encoder model
     target_encoder = torch.hub.load(
         repo_or_dir=dinov3_github_location,
         model=target_encoder_model_name, # should be the same as encoder_model_name
@@ -220,6 +215,7 @@ def init_model(
     encoder.to(device)
     predictor.to(device)
     logger.info(encoder)
+
     return encoder, predictor
 
 def init_opt(
@@ -282,7 +278,7 @@ def encoder_forward_dinov3(self: object, x: Tensor, masks: Optional[List[Tensor]
     x, (H, W) = self.prepare_tokens_with_masks(x=x, masks=None)
     rope_sincos = self.rope_embed(H=H, W=W)
 
-    # -- mask x
+    # mask x
     if masks is not None:
         x_special_tokens = x[:, :self.n_storage_tokens + 1, :]
         x_patch_tokens = x[:, self.n_storage_tokens + 1:, :]
@@ -309,10 +305,10 @@ def encoder_forward_dinov3(self: object, x: Tensor, masks: Optional[List[Tensor]
 
 
 def target_encoder_forward_dinov3(self: object, x: Tensor) -> Tensor:
-    # Used DinoV3 implementation: https://github.com/facebookresearch/dinov3/blob/main/dinov3/models/vision_transformer.py#L222
+    # Used DINOv3 implementation: https://github.com/facebookresearch/dinov3/blob/main/dinov3/models/vision_transformer.py#L222
     x, (H, W) = self.prepare_tokens_with_masks(x=x, masks=None)
     # H, W -> computed after patch embeddings
-    # Rotary Positional Embeddings (RoPE) used by DinoV3 models
+    # Rotary Positional Embeddings (RoPE) used by DINOv3 models
     rope_sincos = self.rope_embed(H=H, W=W)
 
     for _, blk in enumerate(self.blocks):
@@ -321,7 +317,7 @@ def target_encoder_forward_dinov3(self: object, x: Tensor) -> Tensor:
     x_norm = self.norm(x)
 
     # [CLS] token -> position 0; 
-    # DinoV3 uses n_storage_tokens on sequence positions [1, n_storage_tokens] 
+    # DINOv3 uses n_storage_tokens on sequence positions [1, n_storage_tokens] 
     # Patch tokens will be from n_storage_tokens + 1 index to the end of the sequence
     x_norm_patch = x_norm[:, self.n_storage_tokens + 1 :, :]
 

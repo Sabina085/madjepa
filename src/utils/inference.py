@@ -180,14 +180,12 @@ def sample_context(
         encoder_mask = torch.nonzero(encoder_mask.flatten())
         encoder_mask = encoder_mask.squeeze()
 
-        # print("encoder_mask.shape before: ", encoder_mask.shape)
         # Remove from the context the patches contained in the target boxes
         for target_mask in target_masks:
             # encoder_mask = torch.tensor(list(set(encoder_mask.tolist()) - set(target_mask.tolist())))
             # cleaner version
             encoder_mask = encoder_mask[~torch.isin(encoder_mask, target_mask)]
 
-        # print("encoder_mask.shape after: ", encoder_mask.shape)
         if encoder_mask.shape[0] >= min_keep:
             return torch.unsqueeze(encoder_mask, 0)
         else:

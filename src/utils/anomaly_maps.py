@@ -61,8 +61,6 @@ def build_anomaly_map_with_borders(
         interpolation_method=interpolation_method
     )
 
-    # Maybe apply min-max scaling here
-
     assert resized_crop_anomaly_map.shape == (
         borders_dict["bottom"] - borders_dict["top"] + 1, 
         borders_dict["right"] - borders_dict["left"] + 1
@@ -117,7 +115,7 @@ def build_anomaly_map_interpolation(
         agg_strategy: str= "mean",
         interpolation_method=cv2.INTER_LINEAR
     ):
-    # 1. Generate the low-resolution (at patch level) anomaly map grid (14x14)
+    # Generate the low-resolution (at patch level) anomaly map grid (14x14)
     patches_anomaly_map = build_patches_anomaly_map(
         per_patch_distances_dict=per_patch_distances_dict,
         model_input_height=model_input_height,
@@ -126,16 +124,14 @@ def build_anomaly_map_interpolation(
         agg_strategy=agg_strategy
     )
 
-    # 2. Resize to the model's input resolution first (e.g 224x224 for BraTS_slice)
-    # This ensures the patch values fill their respective tiles before scaling to the final crop.
+    # Resize to the model's input resolution (224 x 224)
     model_res_map = cv2.resize(
         patches_anomaly_map, 
         dsize=(model_input_width, model_input_height), 
         interpolation=interpolation_method
     )
 
-    # 3. Smooth and Resize to the actual crop dimensions
-    # cv2.resize expects (width, height)
+    # Resize to the actual crop dimensions
     anomaly_map = cv2.resize(
         model_res_map, 
         dsize=(crop_width, crop_height), 

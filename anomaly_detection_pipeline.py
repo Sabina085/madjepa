@@ -65,7 +65,7 @@ def main(*args, **kwargs):
         print("train_classifier_config_path: ", train_classifier_config_path)
 
         scripts = [
-            # generate prsedictions
+            # generate predictions
             ["python3", "-m", "src.inference.generate_predictions_random_boxes", f"--inference_config_path={inference_config_path}"],
             ["python3", "-m", "src.inference.generate_predictions_distilled_model", f"--inference_config_path={inference_config_path}", f"--train_distilled_model_config_path={train_distillation_config_path}"],
             ["python3", "-m", "src.inference.generate_predictions_classifier_model", f"--inference_config_path={inference_config_path}", f"--train_classification_model_config_path={train_classifier_config_path}"],
@@ -94,7 +94,7 @@ def main(*args, **kwargs):
                         ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", f"--weight_distillation={weight_distillation}", f"--weight_classification={weight_classification}", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"]
                     )
         else:
-            # Test set - compute performance using the best weight_distillation_test and weight_classification_test previously identified on the validation set
+            # Test set - compute performance using the best weight_distillation_test and weight_classification_test previously selected on the validation set
             scripts.append(
                 ["python3", "-m", "src.evaluation.compute_metrics_random_boxes", f"--inference_config_path={inference_config_path}", f"--weight_distillation={weight_distillation_test}", f"--weight_classification={weight_classification_test}", f"--train_distilled_model_config_path={train_distillation_config_path}", f"--train_classifier_config_path={train_classifier_config_path}"]
             )
