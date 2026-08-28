@@ -221,11 +221,7 @@ __marimo__/
 # Folder with experiments and checkpoints
 experiments*/
 pretrained_checkpoints/
-*Test*
-*test*
-*.txt
 *results*
-*Results*
 *.ipynb
 
 # Venv
