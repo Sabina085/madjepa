@@ -8,7 +8,7 @@ data:
 
 inference:
   # How many random target boxes to sample per image
-  num_sampled_random_boxes_per_image: 60
+  num_sampled_random_boxes_per_image: 30
   distance: "l2"
   aggregate_patches_strategy: "mean"
   gaussian_filter_blur_sigma_ijepa: 4
